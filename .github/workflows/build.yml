@@ -8,15 +8,14 @@ name: 'Desktop CI'
 # Triggers:
 #   repository_dispatch (auto, fired by BreezeLauncherBackend webhook
 #     when the private BreezeLauncherPC repo is pushed):
-#     Builds all three RIDs and uploads to the `artifact` rolling release.
+#     Builds all platforms and uploads to the `artifact` rolling release.
 #   workflow_dispatch (manual): same build, for ad-hoc triggers.
 #
-# Three RIDs are built in parallel:
-#   win-x64     -> BreezeLauncher-win-x64.zip
-#   linux-x64   -> BreezeLauncher-linux-x64.tar.gz
-#   linux-arm64 -> BreezeLauncher-linux-arm64.tar.gz
-# All assets are published to THIS repo's `artifact` release so the latest
-# build is always at a stable download URL.
+# Build outputs:
+#   win-x64     -> BreezeLauncher-setup.exe        (Inno Setup installer)
+#   linux-x64   -> breeze-launcher_<ver>_amd64.deb + breeze-launcher-<ver>-1.x86_64.rpm
+#   linux-arm64 -> breeze-launcher_<ver>_arm64.deb + breeze-launcher-<ver>-1.aarch64.rpm
+# All assets are published to THIS repo's `artifact` rolling release.
 
 on:
   workflow_dispatch:
@@ -31,10 +30,8 @@ jobs:
   build:
     name: Build ${{ matrix.rid }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     permissions:
-      # GITHUB_TOKEN needs contents:write to create releases and
-      # upload assets on THIS public repo.
       contents: write
     strategy:
       fail-fast: false
@@ -42,25 +39,13 @@ jobs:
         include:
           - os: windows-latest
             rid: win-x64
-            asset-name: BreezeLauncher-win-x64
-            asset-ext: .zip
           - os: ubuntu-22.04
             rid: linux-x64
-            asset-name: BreezeLauncher-linux-x64
-            asset-ext: .tar.gz
           - os: ubuntu-22.04
             rid: linux-arm64
-            asset-name: BreezeLauncher-linux-arm64
-            asset-ext: .tar.gz
 
     steps:
       - name: Checkout private source repo
-        # Shallow clone the private BreezeLauncherPC repo. No full history
-        # needed — version is derived from build date, not git tags.
-        # PAT must have `repo` scope (or fine-grained: Contents: Read on
-        # BreezeLauncherPC).
-        # Uses shell: bash so ${VAR} expansion works on Windows runners
-        # (PowerShell doesn't expand ${VAR} in the same way).
         env:
           PRIVATE_REPO_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
         shell: bash
@@ -69,13 +54,13 @@ jobs:
           git config user.name "wisebreeze"
           git config user.email "wisebreeze@users.noreply.github.com"
 
-      - name: Capture private repo SHA
-        # github.sha refers to THIS public repo's commit (workflow file),
-        # which does NOT change when only the private repo's source changes.
-        # Use the private repo's HEAD SHA for cache keys instead.
-        id: private_sha
+      - name: Read version from csproj
+        id: version
         shell: bash
-        run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+        run: |
+          VERSION=$(grep -oP '<Version>\K[^<]+' BreezeLauncherPC/BreezeLauncherPC.csproj || echo "0.0.0")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
 
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
@@ -83,47 +68,58 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Cache NuGet packages
-        # Cache restored NuGet packages (~/.nuget/packages). Keyed on the
-        # .csproj hash + RID so a dependency bump or RID change invalidates
-        # the cache. restore-keys falls back to any matching prefix so a
-        # csproj-only change still reuses most packages.
         uses: actions/cache@v4
         with:
           path: ~/.nuget/packages
-          key: nuget-${{ matrix.rid }}-${{ hashFiles('BreezeLauncherPC/**/*.csproj') }}
+          key: nuget-${{ runner.os }}-${{ matrix.rid }}-${{ hashFiles('**/*.csproj') }}
           restore-keys: |
-            nuget-${{ matrix.rid }}-
-            nuget-
+            nuget-${{ runner.os }}-${{ matrix.rid }}-
 
       - name: Publish self-contained
-        # Single-file, self-contained — users don't need .NET runtime
-        # installed. IncludeNativeLibrariesForSelfExtract bundles native
-        # deps (libSkiaSharp etc.) into the single exe. DebugType=embedded
-        # puts PDBs inside the DLL so no separate .pdb shipped.
         working-directory: BreezeLauncherPC
         shell: bash
         run: |
-          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -o ./publish
+          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -o ../publish
 
-      - name: Package (Windows)
-        if: matrix.os == 'windows-latest'
-        working-directory: BreezeLauncherPC/publish
+      # ── Windows: Inno Setup installer ──────────────────────────────
+      - name: Install Inno Setup
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          choco install innosetup --version=6.4.3 -y --no-progress
+
+      - name: Build exe installer
+        if: matrix.rid == 'win-x64'
+        shell: pwsh
+        run: |
+          cd packaging/windows
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+          mv BreezeLauncher-setup.exe ../../BreezeLauncher-setup.exe
+
+      # ── Linux: .deb + .rpm via fpm ────────────────────────────────
+      - name: Install fpm
+        if: startsWith(matrix.rid, 'linux')
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ruby ruby-dev rpm
+          sudo gem install fpm --no-document
+
+      - name: Build deb and rpm packages
+        if: startsWith(matrix.rid, 'linux')
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          chmod +x packaging/linux/build-packages.sh
+          packaging/linux/build-packages.sh "${{ matrix.rid }}" "$VERSION"
+
+      - name: List build outputs
         shell: bash
         run: |
-          7z a -tzip "../../${{ matrix.asset-name }}${{ matrix.asset-ext }}" .
-
-      - name: Package (Linux)
-        if: matrix.os != 'windows-latest'
-        working-directory: BreezeLauncherPC/publish
-        shell: bash
-        run: |
-          chmod +x BreezeLauncher
-          tar -czf "../../${{ matrix.asset-name }}${{ matrix.asset-ext }}" .
+          echo "=== Build outputs ==="
+          ls -lh BreezeLauncher-setup.exe *.deb *.rpm 2>/dev/null || echo "(no files found)"
 
       - name: Ensure artifact release exists
-        # Create the `artifact` rolling release if it doesn't exist yet.
-        # `|| true` tolerates the race when multiple matrix jobs run in
-        # parallel and try to create the same release simultaneously.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -131,18 +127,18 @@ jobs:
           gh release create ${{ env.ARTIFACT_RELEASE_TAG }} \
             --repo "${{ github.repository }}" \
             --title "BreezeLauncher Desktop Build Artifacts" \
-            --notes "Automated build artifacts from CI. The latest desktop binaries are always attached to this release." \
+            --notes "Automated build artifacts from CI. The latest desktop installers are always attached to this release." \
             --draft=false --prerelease=false 2>/dev/null || gh release view ${{ env.ARTIFACT_RELEASE_TAG }} --repo "${{ github.repository }}" >/dev/null
 
-      - name: Upload asset to artifact release
-        # --clobber overwrites any existing asset with the same name
-        # (each build replaces the previous one). delete-asset first
-        # for older gh versions that don't support --clobber.
+      - name: Upload assets to artifact release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          ASSET="${{ matrix.asset-name }}${{ matrix.asset-ext }}"
-          gh release delete-asset ${{ env.ARTIFACT_RELEASE_TAG }} "$ASSET" --repo "${{ github.repository }}" 2>/dev/null || true
-          gh release upload ${{ env.ARTIFACT_RELEASE_TAG }} "$ASSET" --clobber --repo "${{ github.repository }}"
-          echo "Uploaded $ASSET to artifact release on ${{ github.repository }}"
+          for f in BreezeLauncher-setup.exe *.deb *.rpm; do
+            [ -f "$f" ] || continue
+            echo "Uploading $f..."
+            gh release delete-asset ${{ env.ARTIFACT_RELEASE_TAG }} "$f" --repo "${{ github.repository }}" 2>/dev/null || true
+            gh release upload ${{ env.ARTIFACT_RELEASE_TAG }} "$f" --clobber --repo "${{ github.repository }}"
+          done
+          echo "All assets uploaded."

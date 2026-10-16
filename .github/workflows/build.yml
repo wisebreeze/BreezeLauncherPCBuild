@@ -1,0 +1,145 @@
+name: 'Desktop CI'
+
+# This workflow lives in the public BreezeLauncherPCBuild repo purely to
+# consume GitHub Actions free minutes (public repos get unlimited minutes;
+# private repos are capped at 2000/min/month).
+# Source code is cloned from the private BreezeLauncherPC repo at build time.
+#
+# Triggers:
+#   repository_dispatch (auto, fired by BreezeLauncherBackend webhook
+#     when the private BreezeLauncherPC repo is pushed):
+#     Builds all three RIDs and uploads to the `artifact` rolling release.
+#   workflow_dispatch (manual): same build, for ad-hoc triggers.
+#
+# Three RIDs are built in parallel:
+#   win-x64     -> BreezeLauncher-win-x64.zip
+#   linux-x64   -> BreezeLauncher-linux-x64.tar.gz
+#   linux-arm64 -> BreezeLauncher-linux-arm64.tar.gz
+# All assets are published to THIS repo's `artifact` release so the latest
+# build is always at a stable download URL.
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [upstream-changed]
+
+env:
+  ARTIFACT_RELEASE_TAG: "artifact"
+  PRIVATE_REPO: "wisebreeze/BreezeLauncherPC"
+
+jobs:
+  build:
+    name: Build ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    permissions:
+      # GITHUB_TOKEN needs contents:write to create releases and
+      # upload assets on THIS public repo.
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            asset-name: BreezeLauncher-win-x64
+            asset-ext: .zip
+          - os: ubuntu-22.04
+            rid: linux-x64
+            asset-name: BreezeLauncher-linux-x64
+            asset-ext: .tar.gz
+          - os: ubuntu-22.04
+            rid: linux-arm64
+            asset-name: BreezeLauncher-linux-arm64
+            asset-ext: .tar.gz
+
+    steps:
+      - name: Checkout private source repo
+        # Shallow clone the private BreezeLauncherPC repo. No full history
+        # needed — version is derived from build date, not git tags.
+        # PAT must have `repo` scope (or fine-grained: Contents: Read on
+        # BreezeLauncherPC).
+        env:
+          PRIVATE_REPO_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        run: |
+          git clone --filter=blob:none --depth 1 --branch main https://x-access-token:${PRIVATE_REPO_TOKEN}@github.com/${PRIVATE_REPO}.git .
+          git config user.name "wisebreeze"
+          git config user.email "wisebreeze@users.noreply.github.com"
+
+      - name: Capture private repo SHA
+        # github.sha refers to THIS public repo's commit (workflow file),
+        # which does NOT change when only the private repo's source changes.
+        # Use the private repo's HEAD SHA for cache keys instead.
+        id: private_sha
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        # Cache restored NuGet packages (~/.nuget/packages). Keyed on the
+        # .csproj hash + RID so a dependency bump or RID change invalidates
+        # the cache. restore-keys falls back to any matching prefix so a
+        # csproj-only change still reuses most packages.
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ matrix.rid }}-${{ hashFiles('BreezeLauncherPC/**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ matrix.rid }}-
+            nuget-
+
+      - name: Publish self-contained
+        # Single-file, self-contained — users don't need .NET runtime
+        # installed. IncludeNativeLibrariesForSelfExtract bundles native
+        # deps (libSkiaSharp etc.) into the single exe. DebugType=embedded
+        # puts PDBs inside the DLL so no separate .pdb shipped.
+        working-directory: BreezeLauncherPC
+        shell: bash
+        run: |
+          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -o ./publish
+
+      - name: Package (Windows)
+        if: matrix.os == 'windows-latest'
+        working-directory: BreezeLauncherPC/publish
+        shell: bash
+        run: |
+          7z a -tzip "../../${{ matrix.asset-name }}${{ matrix.asset-ext }}" .
+
+      - name: Package (Linux)
+        if: matrix.os != 'windows-latest'
+        working-directory: BreezeLauncherPC/publish
+        shell: bash
+        run: |
+          chmod +x BreezeLauncher
+          tar -czf "../../${{ matrix.asset-name }}${{ matrix.asset-ext }}" .
+
+      - name: Ensure artifact release exists
+        # Create the `artifact` rolling release if it doesn't exist yet.
+        # `|| true` tolerates the race when multiple matrix jobs run in
+        # parallel and try to create the same release simultaneously.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release create ${{ env.ARTIFACT_RELEASE_TAG }} \
+            --repo "${{ github.repository }}" \
+            --title "BreezeLauncher Desktop Build Artifacts" \
+            --notes "Automated build artifacts from CI. The latest desktop binaries are always attached to this release." \
+            --draft=false --prerelease=false 2>/dev/null || gh release view ${{ env.ARTIFACT_RELEASE_TAG }} --repo "${{ github.repository }}" >/dev/null
+
+      - name: Upload asset to artifact release
+        # --clobber overwrites any existing asset with the same name
+        # (each build replaces the previous one). delete-asset first
+        # for older gh versions that don't support --clobber.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          ASSET="${{ matrix.asset-name }}${{ matrix.asset-ext }}"
+          gh release delete-asset ${{ env.ARTIFACT_RELEASE_TAG }} "$ASSET" --repo "${{ github.repository }}" 2>/dev/null || true
+          gh release upload ${{ env.ARTIFACT_RELEASE_TAG }} "$ASSET" --clobber --repo "${{ github.repository }}"
+          echo "Uploaded $ASSET to artifact release on ${{ github.repository }}"

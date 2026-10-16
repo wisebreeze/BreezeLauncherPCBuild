@@ -112,7 +112,8 @@ jobs:
           Write-Host "Using ISCC: $iscc"
           cd packaging/windows
           & $iscc installer.iss
-          Move-Item BreezeLauncher-setup.exe ../BreezeLauncher-setup.exe -Force
+          # Move exe to repo root (we're in packaging/windows/, so ../../)
+          Move-Item BreezeLauncher-setup.exe ../../BreezeLauncher-setup.exe -Force
 
       # ── Linux: .deb + .rpm via fpm ────────────────────────────────
       - name: Install fpm

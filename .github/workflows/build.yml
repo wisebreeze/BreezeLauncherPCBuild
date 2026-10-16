@@ -72,6 +72,10 @@ jobs:
           cache: true
           cache-dependency-path: '**/*.csproj'
 
+      - name: Restore NuGet packages
+        shell: bash
+        run: dotnet restore
+
       # ── Windows: Inno Setup (pre-installed, skip detection) ────────
       - name: Build exe installer
         if: matrix.rid == 'win-x64'

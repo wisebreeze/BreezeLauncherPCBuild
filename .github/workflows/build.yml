@@ -58,7 +58,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          VERSION=$(grep -oP '<Version>\K[^<]+' BreezeLauncherPC/BreezeLauncherPC.csproj || echo "0.0.0")
+          VERSION=$(grep -oP '<Version>\K[^<]+' BreezeLauncherPC.csproj || echo "0.0.0")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected version: $VERSION"
 
@@ -76,10 +76,9 @@ jobs:
             nuget-${{ runner.os }}-${{ matrix.rid }}-
 
       - name: Publish self-contained
-        working-directory: BreezeLauncherPC
         shell: bash
         run: |
-          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -o ../publish
+          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -o publish
 
       # ── Windows: Inno Setup installer ──────────────────────────────
       - name: Install Inno Setup
@@ -113,7 +112,7 @@ jobs:
           Write-Host "Using ISCC: $iscc"
           cd packaging/windows
           & $iscc installer.iss
-          Move-Item BreezeLauncher-setup.exe ../../BreezeLauncher-setup.exe -Force
+          Move-Item BreezeLauncher-setup.exe ../BreezeLauncher-setup.exe -Force
 
       # ── Linux: .deb + .rpm via fpm ────────────────────────────────
       - name: Install fpm

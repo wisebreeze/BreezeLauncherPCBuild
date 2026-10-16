@@ -59,10 +59,13 @@ jobs:
         # needed — version is derived from build date, not git tags.
         # PAT must have `repo` scope (or fine-grained: Contents: Read on
         # BreezeLauncherPC).
+        # Uses shell: bash so ${VAR} expansion works on Windows runners
+        # (PowerShell doesn't expand ${VAR} in the same way).
         env:
           PRIVATE_REPO_TOKEN: ${{ secrets.PRIVATE_REPO_TOKEN }}
+        shell: bash
         run: |
-          git clone --filter=blob:none --depth 1 --branch main https://x-access-token:${PRIVATE_REPO_TOKEN}@github.com/${PRIVATE_REPO}.git .
+          git clone --filter=blob:none --depth 1 --branch main "https://x-access-token:${PRIVATE_REPO_TOKEN}@github.com/${PRIVATE_REPO}.git" .
           git config user.name "wisebreeze"
           git config user.email "wisebreeze@users.noreply.github.com"
 

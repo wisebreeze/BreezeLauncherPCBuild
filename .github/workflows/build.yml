@@ -68,7 +68,10 @@ jobs:
       - name: Cache .NET SDK
         uses: actions/cache@v4
         with:
-          path: ${{ runner.tool_cache }}/dotnet
+          path: |
+            ${{ runner.tool_cache }}/dotnet
+            ${{ runner.tool_cache }}/dncs
+            ~/.dotnet
           key: dotnet-sdk-10.0.x-${{ runner.os }}-v1
 
       - name: Setup .NET 10

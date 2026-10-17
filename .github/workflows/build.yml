@@ -65,27 +65,10 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected version: $VERSION"
 
-      - name: Cache .NET SDK
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ runner.tool_cache }}/dotnet
-            ${{ runner.tool_cache }}/dncs
-            ~/.dotnet
-          key: dotnet-sdk-10.0.x-${{ runner.os }}-v1
-
-      - name: Setup .NET 10
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
+      # .NET 10 SDK + runtimes are preinstalled on windows-latest and
+      # ubuntu-22.04 runner images, so no setup-dotnet step is needed.
+      # NuGet packages are restored by 'dotnet restore' below; caching
+      # them saves ~10s but the image's own NuGet cache is usually warm.
 
       - name: Restore NuGet packages
         shell: bash

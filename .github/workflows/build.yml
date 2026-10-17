@@ -88,10 +88,13 @@ jobs:
         shell: bash
         run: dotnet restore
 
-      - name: Publish self-contained
+      - name: Publish (framework-dependent for testing)
         shell: bash
         run: |
-          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=embedded -o publish --no-restore
+          # Framework-dependent: relies on system .NET 10 Desktop Runtime.
+          # Package is ~30MB instead of ~80MB. Switch to --self-contained true
+          # for production releases so users don't need to install .NET.
+          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained false -p:PublishSingleFile=true -p:DebugType=embedded -o publish --no-restore
 
       # ── Windows: Inno Setup (pre-installed, skip detection) ────────
       # Must run AFTER dotnet publish so publish/ directory exists.

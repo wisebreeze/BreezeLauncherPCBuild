@@ -65,12 +65,28 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected version: $VERSION"
 
+      - name: Cache .NET SDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.tool_cache }}/dotnet
+          key: dotnet-sdk-10.0.x-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            dotnet-sdk-10.0.x-${{ runner.os }}-
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-          cache: true
-          cache-dependency-path: '**/*.csproj'
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore NuGet packages
         shell: bash

@@ -12,7 +12,7 @@ name: 'Desktop CI'
 #   workflow_dispatch (manual): same build, for ad-hoc triggers.
 #
 # Build outputs:
-#   win-x64     -> BreezeLauncher-setup.exe        (Inno Setup installer)
+#   win-x64     -> BreezeLauncher-setup.exe        (custom Avalonia installer)
 #   linux-x64   -> breezelauncher_<ver>_amd64.deb + BreezeLauncher-<ver>-1.x86_64.rpm
 #   linux-arm64 -> breezelauncher_<ver>_arm64.deb + BreezeLauncher-<ver>-1.aarch64.rpm
 # All assets are published to THIS repo's `artifact` rolling release.
@@ -74,23 +74,50 @@ jobs:
         shell: bash
         run: dotnet restore
 
-      - name: Publish (framework-dependent for testing)
+      - name: Publish (self-contained single-file)
         shell: bash
         run: |
-          # Framework-dependent: relies on system .NET 10 Desktop Runtime.
-          # Package is ~30MB instead of ~80MB. Switch to --self-contained true
-          # for production releases so users don't need to install .NET.
-          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained false -p:PublishSingleFile=true -p:DebugType=embedded -o publish --no-restore
+          # Self-contained: bundles .NET 10 runtime, users don't need to
+          # install .NET. ~80MB but zero dependencies.
+          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:DebugType=embedded -o publish --no-restore
 
-      # ── Windows: Inno Setup (pre-installed, skip detection) ────────
-      # Must run AFTER dotnet publish so publish/ directory exists.
-      - name: Build exe installer
+      # ── Windows: custom Avalonia installer ───────────────────────
+      # 1. Zip the app publish output into app.zip
+      # 2. Publish the uninstaller (self-contained single-file)
+      # 3. Embed app.zip + uninstaller.exe into the installer project as
+      #    manifest resources, then publish the installer.
+      - name: Build custom installer (Windows)
         if: matrix.rid == 'win-x64'
-        shell: pwsh
+        shell: bash
         run: |
-          cd packaging/windows
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
-          Move-Item BreezeLauncher-setup.exe ../../BreezeLauncher-setup.exe -Force
+          # 1. Zip the app
+          cd publish
+          zip -r ../app.zip . -x "*.pdb"
+          cd ..
+
+          # 2. Publish uninstaller
+          dotnet publish installer/BreezeLauncherUninstaller/BreezeLauncherUninstaller.csproj \
+            -c Release -r win-x64 --self-contained true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o uninstaller-publish
+
+          # 3. Copy app.zip and uninstaller.exe into installer project
+          #    as EmbeddedResource items (via Directory.Build.props).
+          mkdir -p installer/BreezeLauncherInstaller/Embedded
+          cp app.zip installer/BreezeLauncherInstaller/Embedded/app.zip
+          cp uninstaller-publish/BreezeLauncherUninstaller.exe \
+             installer/BreezeLauncherInstaller/Embedded/BreezeLauncherUninstaller.exe
+
+          # 4. Publish installer (embeds app.zip + uninstaller.exe)
+          dotnet publish installer/BreezeLauncherInstaller/BreezeLauncherInstaller.csproj \
+            -c Release -r win-x64 --self-contained true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o installer-publish
+
+          # 5. Rename to final name
+          mv installer-publish/BreezeLauncherInstaller.exe BreezeLauncher-setup.exe
 
       # ── Linux: .deb + .rpm via fpm ────────────────────────────────
       - name: Install fpm

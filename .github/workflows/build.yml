@@ -90,34 +90,38 @@ jobs:
       #    manifest resources, then publish the installer.
       - name: Build custom installer (Windows)
         if: matrix.rid == 'win-x64'
-        shell: bash
+        shell: pwsh
         run: |
-          # 1. Zip the app
-          cd publish
-          zip -r ../app.zip . -x "*.pdb"
-          cd ..
+          # 1. Zip the app (Windows runner has no `zip` CLI — use .NET ZipFile).
+          #    The publish/ dir was already produced by the previous step.
+          # Remove .pdb files first, then zip.
+          Get-ChildItem publish -Recurse -Filter *.pdb | Remove-Item -Force
+          [System.IO.Compression.ZipFile]::CreateFromDirectory(
+            (Resolve-Path 'publish').Path,
+            (Join-Path (Get-Location) 'app.zip'),
+            [System.IO.Compression.CompressionLevel]::Optimal,
+            $false)
 
           # 2. Publish uninstaller
-          dotnet publish installer/BreezeLauncherUninstaller/BreezeLauncherUninstaller.csproj \
-            -c Release -r win-x64 --self-contained true \
-            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+          dotnet publish installer/BreezeLauncherUninstaller/BreezeLauncherUninstaller.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
             -o uninstaller-publish
 
-          # 3. Copy app.zip and uninstaller.exe into installer project
-          #    as EmbeddedResource items (via Directory.Build.props).
-          mkdir -p installer/BreezeLauncherInstaller/Embedded
-          cp app.zip installer/BreezeLauncherInstaller/Embedded/app.zip
-          cp uninstaller-publish/BreezeLauncherUninstaller.exe \
-             installer/BreezeLauncherInstaller/Embedded/BreezeLauncherUninstaller.exe
+          # 3. Copy app.zip and uninstaller.exe into installer project's Embedded/
+          New-Item -ItemType Directory -Force -Path installer/BreezeLauncherInstaller/Embedded | Out-Null
+          Copy-Item app.zip installer/BreezeLauncherInstaller/Embedded/app.zip -Force
+          Copy-Item uninstaller-publish/BreezeLauncherUninstaller.exe `
+            installer/BreezeLauncherInstaller/Embedded/BreezeLauncherUninstaller.exe -Force
 
           # 4. Publish installer (embeds app.zip + uninstaller.exe)
-          dotnet publish installer/BreezeLauncherInstaller/BreezeLauncherInstaller.csproj \
-            -c Release -r win-x64 --self-contained true \
-            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+          dotnet publish installer/BreezeLauncherInstaller/BreezeLauncherInstaller.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
             -o installer-publish
 
           # 5. Rename to final name
-          mv installer-publish/BreezeLauncherInstaller.exe BreezeLauncher-setup.exe
+          Move-Item installer-publish/BreezeLauncherInstaller.exe BreezeLauncher-setup.exe -Force
 
       # ── Linux: .deb + .rpm via fpm ────────────────────────────────
       - name: Install fpm

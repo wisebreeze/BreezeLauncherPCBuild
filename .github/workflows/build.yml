@@ -74,20 +74,22 @@ jobs:
         shell: bash
         run: dotnet restore
 
-      - name: Publish (self-contained single-file)
+      - name: Publish (framework-dependent single-file)
         shell: bash
         run: |
-          # Self-contained: bundles .NET 10 runtime, users don't need to
-          # install .NET. ~80MB but zero dependencies.
-          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true \
+          # Framework-dependent: relies on system .NET 10 Desktop Runtime.
+          # Package is ~30MB instead of ~150MB. Users need .NET 10
+          # Desktop Runtime installed (the installer will prompt if missing).
+          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained false \
             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
             -p:DebugType=embedded -o publish --no-restore
 
       # ── Windows: custom Avalonia installer ───────────────────────
       # 1. Zip the app publish output into app.zip
-      # 2. Publish the uninstaller (self-contained single-file)
-      # 3. Embed app.zip + uninstaller.exe into the installer project as
-      #    manifest resources, then publish the installer.
+      # 2. Embed app.zip into the installer project as a manifest resource
+      # 3. Publish the installer (framework-dependent, ~5MB)
+      # The installer also serves as the uninstaller (via --uninstall flag),
+      # so no separate uninstaller exe is needed.
       - name: Build custom installer (Windows)
         if: matrix.rid == 'win-x64'
         shell: pwsh
@@ -102,25 +104,17 @@ jobs:
             [System.IO.Compression.CompressionLevel]::Optimal,
             $false)
 
-          # 2. Publish uninstaller
-          dotnet publish installer/BreezeLauncherUninstaller/BreezeLauncherUninstaller.csproj `
-            -c Release -r win-x64 --self-contained true `
-            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
-            -o uninstaller-publish
-
-          # 3. Copy app.zip and uninstaller.exe into installer project's Embedded/
+          # 2. Copy app.zip into installer project's Embedded/
           New-Item -ItemType Directory -Force -Path installer/BreezeLauncherInstaller/Embedded | Out-Null
           Copy-Item app.zip installer/BreezeLauncherInstaller/Embedded/app.zip -Force
-          Copy-Item uninstaller-publish/BreezeLauncherUninstaller.exe `
-            installer/BreezeLauncherInstaller/Embedded/BreezeLauncherUninstaller.exe -Force
 
-          # 4. Publish installer (embeds app.zip + uninstaller.exe)
+          # 3. Publish installer (framework-dependent, embeds app.zip)
           dotnet publish installer/BreezeLauncherInstaller/BreezeLauncherInstaller.csproj `
-            -c Release -r win-x64 --self-contained true `
+            -c Release -r win-x64 --self-contained false `
             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
             -o installer-publish
 
-          # 5. Rename to final name
+          # 4. Rename to final name
           Move-Item installer-publish/BreezeLauncherInstaller.exe BreezeLauncher-setup.exe -Force
 
       # ── Linux: .deb + .rpm via fpm ────────────────────────────────

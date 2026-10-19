@@ -101,11 +101,11 @@ jobs:
         shell: pwsh
         run: |
           # 1. Zip the app (Windows runner has no `zip` CLI — use .NET ZipFile).
-          #    The publish/ dir was already produced by the previous step.
+          #    The publish-win-x64/ dir was already produced by the previous step.
           # Remove .pdb files first, then zip.
-          Get-ChildItem publish -Recurse -Filter *.pdb | Remove-Item -Force
+          Get-ChildItem publish-win-x64 -Recurse -Filter *.pdb | Remove-Item -Force
           [System.IO.Compression.ZipFile]::CreateFromDirectory(
-            (Resolve-Path 'publish').Path,
+            (Resolve-Path 'publish-win-x64').Path,
             (Join-Path (Get-Location) 'app.zip'),
             [System.IO.Compression.CompressionLevel]::Optimal,
             $false)

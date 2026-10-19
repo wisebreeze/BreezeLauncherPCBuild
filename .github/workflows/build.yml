@@ -44,8 +44,7 @@ jobs:
             rid: win-x64
           - os: ubuntu-22.04
             rid: linux-x64
-          - os: ubuntu-22.04
-            rid: linux-arm64
+            extra-rids: linux-arm64
 
     steps:
       - name: Checkout private source repo
@@ -80,9 +79,16 @@ jobs:
           # Framework-dependent: relies on system .NET 10 Desktop Runtime.
           # Package is ~30MB instead of ~150MB. Users need .NET 10
           # Desktop Runtime installed (the installer will prompt if missing).
-          dotnet publish -c Release -r ${{ matrix.rid }} --self-contained false \
-            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
-            -p:DebugType=embedded -o publish --no-restore
+          RIDS="${{ matrix.rid }}"
+          if [ -n "${{ matrix.extra-rids }}" ]; then
+            RIDS="$RIDS ${{ matrix.extra-rids }}"
+          fi
+          for rid in $RIDS; do
+            echo ">>> Publishing $rid..."
+            dotnet publish -c Release -r "$rid" --self-contained false \
+              -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+              -p:DebugType=embedded -o "publish-$rid" --no-restore
+          done
 
       # ── Windows: custom Avalonia installer ───────────────────────
       # 1. Zip the app publish output into app.zip
@@ -132,7 +138,17 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           chmod +x packaging/linux/build-packages.sh
-          packaging/linux/build-packages.sh "${{ matrix.rid }}" "$VERSION"
+          RIDS="${{ matrix.rid }}"
+          if [ -n "${{ matrix.extra-rids }}" ]; then
+            RIDS="$RIDS ${{ matrix.extra-rids }}"
+          fi
+          for rid in $RIDS; do
+            echo ">>> Building packages for $rid..."
+            rm -rf publish
+            cp -r "publish-$rid" publish
+            packaging/linux/build-packages.sh "$rid" "$VERSION"
+            rm -rf publish
+          done
 
       - name: List build outputs
         shell: bash

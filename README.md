@@ -66,7 +66,6 @@ BreezeLauncher is built on the following open-source projects:
 - [Inter font](https://rsms.me/inter/) — UI font family
 
 **Packaging**
-- [Inno Setup 6](https://jrsoftware.org/isinfo.php) — Windows installer creator
 - [fpm](https://github.com/jordansissel/fpm) — Linux .deb / .rpm package builder
 
 ## License

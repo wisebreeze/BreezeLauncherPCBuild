@@ -3,12 +3,14 @@
 [![Build](https://github.com/wisebreeze/BreezeLauncherPCBuild/actions/workflows/build.yml/badge.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-red.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild)
-[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4.svg)](https://dotnet.microsoft.com/)
-[![Framework](https://img.shields.io/badge/Avalonia-11-00A2ED.svg)](https://avaloniaui.net/)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4.svg)](https://dotnet.microsoft.com/)
+[![Framework](https://img.shields.io/badge/Avalonia-12-00A2ED.svg)](https://avaloniaui.net/)
+
+[English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md)
 
 ---
 
-BreezeLauncher is the desktop edition of BreezeLauncher — a modern, cross-platform launcher for Minecraft. It brings the BreezeLauncher experience to Windows and Linux with a native, self-contained binary that requires no additional runtime installation.
+BreezeLauncher is the desktop edition — a modern, cross-platform launcher for Minecraft Bedrock Edition. It brings a native, polished experience to Windows and Linux from a single codebase.
 
 > [!IMPORTANT]
 > **Disclaimer**
@@ -18,14 +20,35 @@ BreezeLauncher is the desktop edition of BreezeLauncher — a modern, cross-plat
 ## Requirements
 
 - **Windows** 10 64-bit or later, or **Linux** x64 / ARM64 with glibc 2.28+
-- No .NET runtime installation needed — the app is fully self-contained
+- Currently framework-dependent — requires .NET 10 Desktop Runtime installed (will switch to self-contained for stable release)
 
 ## Features
 
-- **Cross-platform** — native experience on Windows and Linux from a single codebase
-- **Self-contained** — no .NET runtime or SDK installation required; everything is bundled in the installer
-- **Win11-style UI** — Fluent design with Mica-inspired materials, custom title bar, and smooth animations
-- **Coming soon** — full feature set is under active development
+### Implemented (v0.1.0)
+
+- **Home** — App overview
+- **Download** — Minecraft Bedrock version list (Release / Preview), with search and filter
+  - Data sources: BMCBL API (primary) + mcappx.com (fallback)
+  - Click a version → dialog: instance name, install directory, Xbox Live CDN server selection
+  - 10 CDN nodes tested in parallel, color-coded latency (green / olive / orange / red)
+  - Auto-selects the fastest node, with retest support
+- **Instances** — Installed game instance list
+  - Import from local `.msixvc` file (decrypt + extract)
+  - Auto-detect Release / Preview build type (trial decryption)
+  - Instances persisted across sessions
+- **Settings**
+  - Personalization: theme mode (light / dark / system), transparency effect
+  - General: language (Simplified Chinese / Traditional Chinese / English / System), game directory management
+  - Game directories: add, edit, delete, drag-and-drop reorder, open in file browser
+  - About: version info, check for updates
+
+### Planned
+
+- Microsoft account OAuth login + purchase verification
+- Instance detail page (launch game, open directory, delete)
+- Save management (backup / restore)
+- Resource pack / behavior pack management
+- World management
 
 ## Downloads
 
@@ -46,12 +69,13 @@ The latest build is always attached to the [`artifact`](https://github.com/wiseb
 BreezeLauncher is built on the following open-source projects:
 
 **Runtime / Language**
-- [.NET 8](https://dotnet.microsoft.com/) — cross-platform runtime and SDK
-- [C#](https://learn.microsoft.com/dotnet/csharp/) — programming language
+- [.NET 10](https://dotnet.microsoft.com/) — cross-platform runtime and SDK (LTS, expires 2028-11)
+- [C# 14](https://learn.microsoft.com/dotnet/csharp/) — programming language
 
 **UI / Framework**
-- [Avalonia UI 11](https://avaloniaui.net/) — cross-platform XAML UI framework
+- [Avalonia UI 12.1.4](https://avaloniaui.net/) — cross-platform XAML UI framework
 - [Avalonia Fluent Theme](https://avaloniaui.net/) — Win11 Fluent design theme
+- [FluentIcons.Avalonia 2.1.344](https://github.com/dotnetprojects/FluentIcons) — MIT icon library
 - [Inter font](https://rsms.me/inter/) — UI font family
 
 **Packaging**

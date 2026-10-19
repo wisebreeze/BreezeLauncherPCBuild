@@ -66,7 +66,6 @@ BreezeLauncher 基于以下开源项目构建：
 - [Inter 字体](https://rsms.me/inter/) — UI 字体族
 
 **打包**
-- [Inno Setup 6](https://jrsoftware.org/isinfo.php) — Windows 安装器生成器
 - [fpm](https://github.com/jordansissel/fpm) — Linux .deb / .rpm 打包工具
 
 ## 许可

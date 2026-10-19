@@ -24,31 +24,18 @@ BreezeLauncher is the desktop edition — a modern, cross-platform launcher for 
 
 ## Features
 
-### Implemented (v0.1.0)
-
-- **Home** — App overview
-- **Download** — Minecraft Bedrock version list (Release / Preview), with search and filter
-  - Data sources: BMCBL API (primary) + mcappx.com (fallback)
-  - Click a version → dialog: instance name, install directory, Xbox Live CDN server selection
-  - 10 CDN nodes tested in parallel, color-coded latency (green / olive / orange / red)
-  - Auto-selects the fastest node, with retest support
-- **Instances** — Installed game instance list
-  - Import from local `.msixvc` file (decrypt + extract)
-  - Auto-detect Release / Preview build type (trial decryption)
-  - Instances persisted across sessions
-- **Settings**
-  - Personalization: theme mode (light / dark / system), transparency effect
-  - General: language (Simplified Chinese / Traditional Chinese / English / System), game directory management
-  - Game directories: add, edit, delete, drag-and-drop reorder, open in file browser
-  - About: version info, check for updates
+- Home, Download, Instances, Settings pages
+- Minecraft Bedrock version list with search and filter
+- Xbox Live CDN server selection with speed test
+- msixvc import (decrypt + extract)
+- Game directory management with drag-to-reorder
+- i18n: English / 简体中文 / 繁體中文
 
 ### Planned
 
-- Microsoft account OAuth login + purchase verification
-- Instance detail page (launch game, open directory, delete)
-- Save management (backup / restore)
-- Resource pack / behavior pack management
-- World management
+- Microsoft account OAuth + purchase verification
+- Instance detail (launch / open / delete)
+- Save / resource pack / world management
 
 ## Downloads
 

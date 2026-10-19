@@ -67,14 +67,8 @@ jobs:
 
       # .NET 10 SDK + runtimes are preinstalled on windows-latest and
       # ubuntu-22.04 runner images, so no setup-dotnet step is needed.
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
+      # NuGet packages are restored by 'dotnet restore' below; caching
+      # them saves ~10s but the image's own NuGet cache is usually warm.
 
       - name: Restore NuGet packages
         shell: bash

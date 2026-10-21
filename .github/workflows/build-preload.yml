@@ -1,0 +1,61 @@
+name: Build BreezePreload.dll
+
+# Manually triggered. Builds the native BreezePreload.dll bootstrap
+# DLL on a Windows runner with MSVC, then uploads it as an artifact.
+#
+# The DLL is needed by the PE-import-table-based mod loader in
+# BreezeLauncherPC. Linux/macOS runners can't build it (MSVC required),
+# so this workflow produces the Windows x64 binary that gets embedded
+# as an Avalonia resource in the main launcher build.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch / tag / commit SHA in BreezeLauncherPC to build from'
+        required: false
+        default: 'main'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout BreezeLauncherPC (private)
+        uses: actions/checkout@v4
+        with:
+          repository: wisebreeze/BreezeLauncherPC
+          ref: ${{ github.event.inputs.ref || 'main' }}
+          token: ${{ secrets.PC_REPO_TOKEN }}
+          path: BreezeLauncherPC
+          fetch-depth: 1
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmake@v1
+        with:
+          arch: x64
+
+      - name: Build BreezePreload.dll
+        shell: cmd
+        working-directory: BreezeLauncherPC\native\BreezePreload
+        run: |
+          .\build.bat
+
+      - name: Verify build output
+        shell: pwsh
+        run: |
+          $dll = "BreezeLauncherPC\native\BreezePreload\build\BreezePreload.dll"
+          if (-not (Test-Path $dll)) {
+            Write-Error "BreezePreload.dll not found at $dll"
+            exit 1
+          }
+          $size = (Get-Item $dll).Length
+          Write-Host "Built BreezePreload.dll: $size bytes"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BreezePreload-dll
+          path: BreezeLauncherPC/native/BreezePreload/build/BreezePreload.dll
+          retention-days: 30
+          if-no-files-found: error

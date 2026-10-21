@@ -26,7 +26,7 @@ jobs:
         with:
           repository: wisebreeze/BreezeLauncherPC
           ref: ${{ github.event.inputs.ref || 'main' }}
-          token: ${{ secrets.PC_REPO_TOKEN }}
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
           path: BreezeLauncherPC
           fetch-depth: 1
 

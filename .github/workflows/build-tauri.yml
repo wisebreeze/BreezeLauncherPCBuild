@@ -1,0 +1,125 @@
+name: 'Tauri Build (test)'
+
+# Test build for the Tauri migration preview. Clones the private
+# BreezeLauncherPC repo and runs `cargo check` + `npm run build` on
+# Windows, Linux, and macOS to verify the code compiles on all three
+# platforms — especially the platform-specific accent color code
+# (WinRT on Windows, NSColor/NSDistributedNotificationCenter on macOS,
+# gsettings on Linux).
+#
+# This workflow does NOT produce release artifacts. It's a compile
+# gate: if any platform fails to build, the run is marked failed.
+#
+# Triggers:
+#   workflow_dispatch (manual): ad-hoc, optionally on a specific ref.
+#   repository_dispatch (auto, fired by BreezeLauncherBackend webhook
+#     when the private BreezeLauncherPC repo is pushed): same build.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch / tag / commit SHA in BreezeLauncherPC to build from'
+        required: false
+        default: 'main'
+  repository_dispatch:
+    types: [upstream-changed]
+
+env:
+  PRIVATE_REPO: 'wisebreeze/BreezeLauncherPC'
+
+jobs:
+  build:
+    name: Build ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-22.04
+            rid: linux-x64
+          - os: macos-latest
+            rid: macos-universal
+
+    steps:
+      - name: Checkout private source repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_REPO }}
+          ref: ${{ github.event.inputs.ref || 'main' }}
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: BreezeLauncherPC
+          fetch-depth: 1
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: BreezeLauncherPC/package-lock.json
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust target
+        uses: actions/cache@v4
+        with:
+          path: |
+            BreezeLauncherPC/src-tauri/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ matrix.rid }}-cargo-${{ hashFiles('BreezeLauncherPC/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.rid }}-cargo-
+
+      # Linux: Tauri requires webkit2gtk and other system deps.
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install npm dependencies
+        working-directory: BreezeLauncherPC
+        run: npm ci
+
+      # Frontend type-check + build (tsc --noEmit && vite build).
+      - name: Build frontend
+        working-directory: BreezeLauncherPC
+        run: npm run build
+
+      # Cargo check verifies the Rust code compiles for the host target.
+      # We use `check` (not `build`) to skip linking — faster, and
+      # linking on macOS would require a full app bundle context.
+      - name: Cargo check (Rust backend)
+        working-directory: BreezeLauncherPC/src-tauri
+        run: cargo check --all-targets
+
+      # Full Tauri build (frontend + Rust + bundle). This is the real
+      # test — if the platform-specific accent code has any issue
+      # (wrong objc2 API, missing feature flag, etc.), this step fails.
+      - name: Tauri build
+        working-directory: BreezeLauncherPC
+        run: npm run tauri build
+        env:
+          # CI builds don't need code signing for the compile test.
+          # macOS: skip signing/notarization.
+          APPLE_SIGNING_ENABLED: 'false'
+          # Windows: skip code signing.
+          TAURI_SIGNING_PRIVATE_KEY: ''
+
+      - name: List build outputs
+        if: always()
+        shell: bash
+        working-directory: BreezeLauncherPC
+        run: |
+          echo "=== Tauri build outputs ==="
+          find src-tauri/target/release/bundle -type f 2>/dev/null | head -20 || echo "(no bundle files)"

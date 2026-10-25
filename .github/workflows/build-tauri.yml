@@ -88,11 +88,20 @@ jobs:
       - name: Setup Rust (with target cache)
         uses: dtolnay/rust-toolchain@stable
 
+      # Cache Rust build artifacts. Swatinem/rust-cache caches the
+      # target/ directory + ~/.cargo. Keyed on Cargo.lock hash + OS
+      # so cache hits are per-platform (native deps differ).
+      # On a hit, `cargo build --release` only recompiles our own crate
+      # (breezelauncher, ~30s) — all 460+ deps are already compiled.
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: 'BreezeLauncherPC/src-tauri'
           key: ${{ matrix.rid }}
+          # Cache both debug and release target dirs. We only build
+          # release now (cargo check was removed), but keeping debug
+          # cached helps if we re-add it later.
+          cache-targets: true
 
       # Linux: Tauri requires webkit2gtk and other system deps that are
       # NOT pre-installed on the runner image. Cache the apt downloads
@@ -122,16 +131,14 @@ jobs:
         working-directory: BreezeLauncherPC
         run: npm run build
 
-      # Cargo check verifies the Rust code compiles for the host target.
-      # Faster than `cargo build` — skips linking. Catches API misuse
-      # (wrong objc2 method signatures, missing features, etc.).
-      - name: Cargo check (Rust backend)
-        working-directory: BreezeLauncherPC/src-tauri
-        run: cargo check --all-targets
-
       # Full Tauri build (frontend + Rust + bundle). This is the real
       # test — if the platform-specific accent code has any issue
       # (wrong objc2 API, missing feature flag, etc.), this step fails.
+      # We skip the separate `cargo check` step: tauri build runs
+      # `cargo build --release` which is a superset of check (it also
+      # links + bundles). Running check separately would compile the
+      # deps twice (once in debug for check, once in release for build)
+      # — wasted time.
       - name: Tauri build
         working-directory: BreezeLauncherPC
         run: npm run tauri build

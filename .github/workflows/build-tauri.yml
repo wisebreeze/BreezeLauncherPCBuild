@@ -129,6 +129,33 @@ jobs:
           # Windows: skip code signing.
           TAURI_SIGNING_PRIVATE_KEY: ''
 
+      # Compress the Linux AppImage with upx. AppImage bundles the full
+      # webkit2gtk runtime (~50MB) so the uncompressed image is ~77MB.
+      # upx --best --lzma typically shrinks it 50-60%.
+      # Only run on Linux where AppImage is produced.
+      - name: Compress AppImage with upx
+        if: runner.os == 'Linux'
+        shell: bash
+        working-directory: BreezeLauncherPC
+        run: |
+          # Find the AppImage (name includes version, so glob it).
+          APPIMAGE=$(find src-tauri/target/release/bundle/appimage -name '*.AppImage' -type f | head -1)
+          if [ -z "$APPIMAGE" ]; then
+            echo "No AppImage found — skipping upx"
+            exit 0
+          fi
+          BEFORE=$(stat -c%s "$APPIMAGE")
+          echo "Before upx: $((BEFORE / 1024 / 1024)) MB ($APPIMAGE)"
+          # Install upx via apt (fast, ~1MB).
+          sudo apt-get install -y -qq upx-ucl
+          # --best: highest compression. --lzma: use LZMA (slower but smaller).
+          # upx doesn't compress well on already-stripped binaries, but the
+          # webkit2gtk shared libs inside the AppImage compress well.
+          upx --best --lzma "$APPIMAGE" || echo "upx failed (non-fatal)"
+          AFTER=$(stat -c%s "$APPIMAGE")
+          echo "After upx:  $((AFTER / 1024 / 1024)) MB"
+          echo "Saved:      $(((BEFORE - AFTER) / 1024 / 1024)) MB ($(( (BEFORE - AFTER) * 100 / BEFORE ))%)"
+
       - name: List build outputs
         if: always()
         shell: bash

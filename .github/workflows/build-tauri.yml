@@ -14,6 +14,13 @@ name: 'Tauri Build (test)'
 #   workflow_dispatch (manual): ad-hoc, optionally on a specific ref.
 #   repository_dispatch (auto, fired by BreezeLauncherBackend webhook
 #     when the private BreezeLauncherPC repo is pushed): same build.
+#
+# Runner pre-installed software (no setup actions needed):
+#   - Node.js 20/22 (we still use setup-node for the npm cache).
+#   - Rust stable via rustup (we still use rust-toolchain for caching
+#     and to pin a consistent toolchain across runs).
+#   - Linux: webkit2gtk, gtk3, etc. are NOT pre-installed — apt step
+#     is required.
 
 on:
   workflow_dispatch:
@@ -54,28 +61,28 @@ jobs:
           path: BreezeLauncherPC
           fetch-depth: 1
 
-      - name: Install Node.js
+      # Node.js is pre-installed on the runner, but setup-node gives us
+      # the npm cache for free (keyed on package-lock.json hash).
+      - name: Setup Node.js (with npm cache)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: BreezeLauncherPC/package-lock.json
 
-      - name: Install Rust stable
+      # Rust is pre-installed via rustup, but rust-toolchain pins a
+      # consistent version and integrates with Swatinem/rust-cache.
+      - name: Setup Rust (with target cache)
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Rust target
-        uses: actions/cache@v4
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            BreezeLauncherPC/src-tauri/target
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ matrix.rid }}-cargo-${{ hashFiles('BreezeLauncherPC/src-tauri/Cargo.lock') }}
-          restore-keys: |
-            ${{ matrix.rid }}-cargo-
+          workspaces: 'BreezeLauncherPC/src-tauri'
+          key: ${{ matrix.rid }}
 
-      # Linux: Tauri requires webkit2gtk and other system deps.
+      # Linux: Tauri requires webkit2gtk and other system deps that are
+      # NOT pre-installed on the runner image.
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
         run: |
@@ -97,8 +104,8 @@ jobs:
         run: npm run build
 
       # Cargo check verifies the Rust code compiles for the host target.
-      # We use `check` (not `build`) to skip linking — faster, and
-      # linking on macOS would require a full app bundle context.
+      # Faster than `cargo build` — skips linking. Catches API misuse
+      # (wrong objc2 method signatures, missing features, etc.).
       - name: Cargo check (Rust backend)
         working-directory: BreezeLauncherPC/src-tauri
         run: cargo check --all-targets

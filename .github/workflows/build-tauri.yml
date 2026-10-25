@@ -70,6 +70,19 @@ jobs:
           cache: 'npm'
           cache-dependency-path: BreezeLauncherPC/package-lock.json
 
+      # Cache node_modules directly (in addition to the npm download cache
+      # above). The npm cache (~/.npm) stores downloaded tarballs; npm ci
+      # still has to extract + link them into node_modules on every run.
+      # Caching node_modules skips that extraction step entirely on cache
+      # hits. Keyed on package-lock.json hash + OS (native deps differ).
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: BreezeLauncherPC/node_modules
+          key: node_modules-${{ matrix.rid }}-${{ hashFiles('BreezeLauncherPC/package-lock.json') }}
+          restore-keys: |
+            node_modules-${{ matrix.rid }}-
+
       # Rust is pre-installed via rustup, but rust-toolchain pins a
       # consistent version and integrates with Swatinem/rust-cache.
       - name: Setup Rust (with target cache)

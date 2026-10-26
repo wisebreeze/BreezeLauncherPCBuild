@@ -75,13 +75,19 @@ jobs:
       # still has to extract + link them into node_modules on every run.
       # Caching node_modules skips that extraction step entirely on cache
       # hits. Keyed on package-lock.json hash + OS (native deps differ).
+      #
+      # IMPORTANT: npm ci deletes node_modules before installing, so a
+      # cache restore is wasted unless we skip npm ci on hit. The
+      # `cache-hit` output drives the conditional on the install step
+      # below. restore-keys is intentionally omitted — a partial
+      # (stale) node_modules restore would be wiped by npm ci anyway,
+      # so there's no benefit.
       - name: Cache node_modules
+        id: cache-node-modules
         uses: actions/cache@v4
         with:
           path: BreezeLauncherPC/node_modules
           key: node_modules-${{ matrix.rid }}-${{ hashFiles('BreezeLauncherPC/package-lock.json') }}
-          restore-keys: |
-            node_modules-${{ matrix.rid }}-
 
       # Rust is pre-installed via rustup, but rust-toolchain pins a
       # consistent version and integrates with Swatinem/rust-cache.
@@ -123,6 +129,13 @@ jobs:
           refresh: true
 
       - name: Install npm dependencies
+        # Skip npm ci entirely when node_modules was restored from cache
+        # (package-lock.json unchanged). npm ci would delete node_modules
+        # and reinstall everything — defeating the cache. On a cache miss
+        # (lock file changed, or first run), npm ci runs as usual; the
+        # ~/.npm download cache (setup-node above) still speeds up the
+        # tarball downloads.
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         working-directory: BreezeLauncherPC
         run: npm ci
 

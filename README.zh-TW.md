@@ -2,74 +2,92 @@
 
 [![Build](https://github.com/wisebreeze/BreezeLauncherPCBuild/actions/workflows/build.yml/badge.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-red.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild)
-[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4.svg)](https://dotnet.microsoft.com/)
-[![Framework](https://img.shields.io/badge/Avalonia-12-00A2ED.svg)](https://avaloniaui.net/)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild)
+[![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB.svg)](https://tauri.app/)
+[![Rust](https://img.shields.io/badge/Rust-1.77.2+-000000.svg?logo=rust)](https://www.rust-lang.org/)
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md)
 
 ---
 
-BreezeLauncher 桌面版 — 現代、跨平台的 Minecraft 基岩版啟動器。單一程式碼庫，為 Windows 和 Linux 提供原生、精緻的體驗。
+BreezeLauncher 桌面版 — 跨平台的 Minecraft 基岩版與 Java 版啟動器。單一程式碼庫，為 Windows、Linux 與 macOS 提供原生、精緻的體驗。
+
+本倉庫僅承載 CI 與發行產物，原始碼位於私有倉庫，建置時檢出。
 
 > [!IMPORTANT]
 > **免責聲明**
 >
-> BreezeLauncher **不隸屬於、不受認可、也不受贊助於** Mojang Studios、Microsoft 或任何第三方。這**不是官方 Minecraft 產品**。Minecraft 是 Mojang Studios 的商標。所有產品名稱、徽標和品牌均歸其各自所有者所有。
+> BreezeLauncher **不隸屬於、不受認可、也不受贊助於** Mojang Studios、Microsoft 或任何第三方。這**不是官方 Minecraft 產品**。Minecraft 是 Mojang Studios 的商標。所有產品名稱、標誌與品牌均歸其各自所有者所有。
 
 ## 系統需求
 
-- **Windows** 10 64 位元或更新版本，或 **Linux** x64 / ARM64（glibc 2.28+）
-- 目前為 framework-dependent 模式 — 需安裝 .NET 10 Desktop Runtime（正式發布時改為 self-contained）
+- **Windows** 10 1803+（含 WebView2 執行階段，Win10/11 已預裝），x64
+- **Linux** x64，glibc 2.28+，需要 `webkit2gtk-4.1` 與 `libgtk-3`
+- **macOS** 10.15 以上，Intel 與 Apple Silicon 皆可
+
+可攜版 — 無需安裝器，不寫登錄檔，不佔用 `Program Files`。
 
 ## 功能
 
-- 首頁、下載、實例、設定頁面
-- Minecraft 基岩版版本列表，支援搜尋和過濾
+- 首頁、下載、實例、任務、設定頁面
+- Minecraft 基岩版版本列表，支援搜尋與過濾
 - Xbox Live CDN 伺服器選擇 + 測速
 - msixvc 匯入（解密 + 解壓縮）
 - 遊戲目錄管理，支援拖曳排序
-- 多語言：簡體中文 / 繁體中文 / English
+- Java 版：版本列表、模組載入器（Fabric / Quilt / Forge / NeoForge）、單一任務完成安裝
+- Java 版啟動：classpath、natives、帳號、記憶體、JVM 參數、視窗大小
+- 帳號：微軟（裝置代碼）、離線、第三方（authlib-injector）
+- 多語言：繁體中文 / 简体中文 / English
 
 ### 計畫中
 
-- 微軟帳號 OAuth + 購買驗證
-- 實例詳情（啟動 / 開啟 / 刪除）
+- 基岩版實例的啟動追蹤
 - 存檔 / 資源包 / 世界管理
 
 ## 下載
 
-預先建置的安裝包發布在 [Releases](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases) 頁面：
+預建置產物發佈於 [Releases](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases) 頁面，檔名形如 `BreezeLauncher_0.1.0_*`：
 
-| 平台 | 格式 | 下載 |
-|------|------|------|
-| Windows x64 | `.exe` 安裝器 | [BreezeLauncher-setup.exe](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/download/artifact/BreezeLauncher-setup.exe) |
-| Linux x64 | `.deb` | [breezelauncher_latest_amd64.deb](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/download/artifact/breezelauncher_0.1.0_amd64.deb) |
-| Linux x64 | `.rpm` | [BreezeLauncher-latest.x86_64.rpm](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/download/artifact/BreezeLauncher-0.1.0-1.x86_64.rpm) |
-| Linux ARM64 | `.deb` | [breezelauncher_latest_arm64.deb](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/download/artifact/breezelauncher_0.1.0_arm64.deb) |
-| Linux ARM64 | `.rpm` | [BreezeLauncher-latest.aarch64.rpm](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/download/artifact/BreezeLauncher-0.1.0-1.aarch64.rpm) |
+| 平台 | 格式 |
+|------|------|
+| Windows x64 | `.exe` 安裝器（NSIS）、`.msi` |
+| Linux x64 | `.deb`、`.rpm`、`.AppImage` |
+| macOS 通用 | `.dmg`（Intel + Apple Silicon） |
 
-最新建置始終附在 [`artifact`](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/tag/artifact) 滾動發布上。
+最新建置始終附在 [`artifact`](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/tag/artifact) 滾動發行上。
+
+### macOS 首次開啟
+
+產物未以 Apple 開發者憑證簽名與公證，Gatekeeper 會攔截首次啟動。右鍵 `BreezeLauncher.app` → **打開**，或在終端機移除隔離標記：
+
+```bash
+xattr -dr com.apple.quarantine /Applications/BreezeLauncher.app
+```
 
 ## 開源致謝
 
 BreezeLauncher 基於以下開源專案建置：
 
 **執行階段 / 語言**
-- [.NET 10](https://dotnet.microsoft.com/) — 跨平台執行階段和 SDK（LTS，2028-11 到期）
-- [C# 14](https://learn.microsoft.com/dotnet/csharp/) — 程式語言
+- [Rust](https://www.rust-lang.org/) — 後端語言
+- [Tauri 2](https://tauri.app/) — 桌面應用框架
 
-**UI / 框架**
-- [Avalonia UI 12.1.4](https://avaloniaui.net/) — 跨平台 XAML UI 框架
-- [Avalonia Fluent Theme](https://avaloniaui.net/) — Win11 Fluent 設計主題
-- [FluentIcons.Avalonia 2.1.344](https://github.com/dotnetprojects/FluentIcons) — MIT 圖示庫
-- [Inter 字體](https://rsms.me/inter/) — UI 字體族
+**前端**
+- [React 19](https://react.dev/) — UI 函式庫
+- [Fluent UI React v9](https://react.fluentui.dev/) — 微軟 Fluent 設計系統元件
+- [Fluent System Icons](https://github.com/microsoft/fluentui-system-icons) — MIT 圖示集
+- [Vite](https://vite.dev/) — 建置工具
+- [React Router](https://reactrouter.com/) — 路由
+- [i18next / react-i18next](https://www.i18next.com/) — 國際化
+- [dnd-kit](https://dndkit.com/) — 拖曳排序
+- [TanStack Virtual](https://tanstack.com/virtual) — 列表虛擬化
+- [Framer Motion](https://motion.dev/) — 動畫
 
 **打包**
-- [fpm](https://github.com/jordansissel/fpm) — Linux .deb / .rpm 打包工具
+- [Tauri bundler](https://tauri.app/) — `.msi` / NSIS / `.deb` / `.rpm` / `.AppImage` / `.dmg`
 
 ## 授權
 
 版權所有 © 2026 wisebreeze。保留所有權利。
 
-未經版權所有者事先書面許可，嚴禁以任何形式複製、修改、分發或逆向工程本軟體的全部或部分內容。
+未經版權所有者事先書面許可，嚴禁以任何形式複製、修改、發佈或逆向工程本軟體的全部或部分內容。

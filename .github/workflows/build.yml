@@ -89,6 +89,12 @@ jobs:
           key: ${{ matrix.rid }}
           cache-targets: true
 
+      # macOS: build Intel + Apple Silicon and let the Tauri CLI merge them
+      # into one universal .app before the dmg is produced.
+      - name: Add Apple Intel target
+        if: runner.os == 'macOS'
+        run: rustup target add x86_64-apple-darwin
+
       # Linux: Tauri requires webkit2gtk and other system deps.
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
@@ -116,7 +122,7 @@ jobs:
       # Full Tauri build (frontend + Rust + bundle).
       - name: Tauri build
         working-directory: BreezeLauncherPC
-        run: npm run tauri build
+        run: ${{ runner.os == 'macOS' && 'npm run tauri build -- --target universal-apple-darwin' || 'npm run tauri build' }}
         env:
           # CI builds don't need code signing.
           APPLE_SIGNING_ENABLED: 'false'
@@ -146,7 +152,7 @@ jobs:
         working-directory: BreezeLauncherPC
         run: |
           echo "=== Tauri build outputs ==="
-          find src-tauri/target/release/bundle -type f 2>/dev/null || echo "(no bundle files)"
+          find src-tauri/target -path '*/bundle/*' -type f 2>/dev/null || echo "(no bundle files)"
 
       # ── Upload to the `artifact` rolling release ──────────────────
       # All bundle files (msi, exe, deb, rpm, AppImage, dmg) are uploaded
@@ -168,11 +174,13 @@ jobs:
         shell: bash
         working-directory: BreezeLauncherPC
         run: |
-          BUNDLE_DIR="src-tauri/target/release/bundle"
-          if [ ! -d "$BUNDLE_DIR" ]; then
+          # Universal macOS builds land in target/universal-apple-darwin/release.
+          BUNDLE_DIR=$(find src-tauri/target -type d -path '*/release/bundle' | head -1)
+          if [ -z "$BUNDLE_DIR" ]; then
             echo "No bundle directory — nothing to upload"
             exit 0
           fi
+          echo "Bundle dir: $BUNDLE_DIR"
           # Collect all installable artifacts (skip intermediate files).
           shopt -s nullglob
           FILES=(

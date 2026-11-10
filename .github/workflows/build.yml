@@ -51,7 +51,7 @@ jobs:
 
     steps:
       - name: Checkout private source repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ env.PRIVATE_REPO }}
           ref: ${{ github.event.inputs.ref || 'main' }}
@@ -62,16 +62,16 @@ jobs:
       # Node.js is pre-installed on the runner, but setup-node gives us
       # the npm cache for free (keyed on package-lock.json hash).
       - name: Setup Node.js (with npm cache)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: BreezeLauncherPC/package-lock.json
 
       # Cache node_modules directly. Keyed on package-lock.json hash + OS.
       - name: Cache node_modules
         id: cache-node-modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: BreezeLauncherPC/node_modules
           key: node_modules-${{ matrix.rid }}-${{ hashFiles('BreezeLauncherPC/package-lock.json') }}

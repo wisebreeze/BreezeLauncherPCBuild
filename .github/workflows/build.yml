@@ -64,16 +64,16 @@ jobs:
           path: BreezeLauncherPC
           fetch-depth: 1
 
-      # Node.js is pre-installed on the runner, but setup-node gives us
-      # the npm cache for free (keyed on package-lock.json hash).
-      - name: Setup Node.js (with npm cache)
+      # Node.js is pre-installed on the runner; setup-node just pins the
+      # version. We cache node_modules directly (below) so npm ci is
+      # skipped entirely on cache hit — faster than the npm download cache.
+      - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
           node-version: '24'
-          cache: 'npm'
-          cache-dependency-path: BreezeLauncherPC/package-lock.json
 
       # Cache node_modules directly. Keyed on package-lock.json hash + OS.
+      # On hit, npm ci is skipped entirely (saves ~15-30s).
       - name: Cache node_modules
         id: cache-node-modules
         uses: actions/cache@v5

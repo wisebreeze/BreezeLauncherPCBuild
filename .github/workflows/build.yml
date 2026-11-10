@@ -124,13 +124,15 @@ jobs:
 
       # Full Tauri build (Rust + bundle). --no-before-build skips the
       # beforeBuildCommand (npm run build) since we already ran it above.
+      # Use npx to avoid npm's '--' argument parsing differences across
+      # platforms (Windows npm swallows the first '--').
       - name: Tauri build
         working-directory: BreezeLauncherPC
         run: |
           if [ "${{ runner.os }}" = "macOS" ]; then
-            npm run tauri build -- --target ${{ matrix.target }} --no-before-build
+            npx tauri build --target ${{ matrix.target }} --no-before-build
           else
-            npm run tauri build -- --no-before-build
+            npx tauri build --no-before-build
           fi
         shell: bash
         env:

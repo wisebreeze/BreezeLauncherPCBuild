@@ -45,7 +45,7 @@ jobs:
         include:
           - os: windows-latest
             rid: win-x64
-          - os: ubuntu-22.04
+          - os: ubuntu-26.04
             rid: linux-x64
           - os: macos-latest
             rid: macos-arm64
@@ -64,13 +64,8 @@ jobs:
           path: BreezeLauncherPC
           fetch-depth: 1
 
-      # Node.js: macOS 26 runners ship Node 24 pre-installed, so
-      # setup-node is only needed on Windows/Linux (which ship Node 22).
-      - name: Setup Node.js
-        if: runner.os != 'macOS'
-        uses: actions/setup-node@v5
-        with:
-          node-version: '24'
+      # All runners (windows-latest, ubuntu-26.04, macos-26) ship Node.js
+      # 24 pre-installed, so setup-node is no longer needed.
 
       # Cache node_modules directly. Keyed on package-lock.json hash + OS.
       # On hit, npm ci is skipped entirely (saves ~15-30s).

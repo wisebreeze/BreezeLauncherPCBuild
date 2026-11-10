@@ -138,22 +138,15 @@ jobs:
         working-directory: BreezeLauncherPC
         run: npm ci
 
-      # Frontend type-check + build (tsc --noEmit && vite build).
-      # This produces dist/ which Tauri bundles. The Tauri build step
-      # below uses --no-before-build so it doesn't re-run this.
-      - name: Build frontend
-        working-directory: BreezeLauncherPC
-        run: npm run build
-
-      # Full Tauri build (Rust + bundle). --no-before-build skips the
-      # beforeBuildCommand (npm run build) since we already ran it above.
+      # Full Tauri build (frontend + Rust + bundle).
+      # Tauri runs beforeBuildCommand (npm run build) automatically.
       - name: Tauri build
         working-directory: BreezeLauncherPC
         run: |
           if [ "${{ runner.os }}" = "macOS" ]; then
-            node node_modules/@tauri-apps/cli/main.js build --target ${{ matrix.target }} --no-before-build
+            npm run tauri build -- --target ${{ matrix.target }}
           else
-            node node_modules/@tauri-apps/cli/main.js build --no-before-build
+            npm run tauri build
           fi
         shell: bash
         env:

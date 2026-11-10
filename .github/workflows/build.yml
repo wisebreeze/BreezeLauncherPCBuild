@@ -82,12 +82,18 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       # Cache Rust build artifacts. Keyed on Cargo.lock hash + target.
+      # cache-all-crates: also cache ~/.cargo/registry (downloaded crate
+      #   sources) so a cache hit skips the 'Downloading crates...' phase.
+      # cache-on-failure: save cache even if the build fails, so a partial
+      #   build's compiled deps are reused on the retry.
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: 'BreezeLauncherPC/src-tauri'
           key: ${{ matrix.rid }}
           cache-targets: true
+          cache-all-crates: true
+          cache-on-failure: true
 
       # macOS: add the cross-compile target so Tauri can build for it.
       # (The host runner already has its native target; this adds the

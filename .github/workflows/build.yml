@@ -82,12 +82,17 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       # Cache Rust build artifacts. Keyed on Cargo.lock hash + OS.
+      # macOS universal builds compile two targets; cache both so the
+      # second target doesn't recompile from scratch every run.
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: 'BreezeLauncherPC/src-tauri'
           key: ${{ matrix.rid }}
           cache-targets: true
+          # Also cache the Intel target on macOS (the runner is arm64,
+          # so aarch64 is the default; x86_64 is the cross-compile target).
+          target: ${{ runner.os == 'macOS' && 'x86_64-apple-darwin' || '' }}
 
       # macOS: build Intel + Apple Silicon and let the Tauri CLI merge them
       # into one universal .app before the dmg is produced.

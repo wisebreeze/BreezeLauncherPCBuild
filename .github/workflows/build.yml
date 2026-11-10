@@ -198,7 +198,17 @@ jobs:
           for f in "${FILES[@]}"; do
             BASENAME=$(basename "$f")
             echo "Uploading $BASENAME..."
-            gh release delete-asset ${{ env.ARTIFACT_RELEASE_TAG }} "$BASENAME" --repo "${{ github.repository }}" 2>/dev/null || true
-            gh release upload ${{ env.ARTIFACT_RELEASE_TAG }} "$f" --clobber --repo "${{ github.repository }}"
+            # Delete any existing asset with the same name first, then
+            # upload. Retry up to 3 times to handle the race where
+            # parallel platform jobs upload to the same rolling release.
+            for attempt in 1 2 3; do
+              gh release delete-asset ${{ env.ARTIFACT_RELEASE_TAG }} "$BASENAME" --repo "${{ github.repository }}" --yes 2>/dev/null || true
+              if gh release upload ${{ env.ARTIFACT_RELEASE_TAG }} "$f" --clobber --repo "${{ github.repository }}" 2>/dev/null; then
+                echo "  uploaded (attempt $attempt)"
+                break
+              fi
+              echo "  attempt $attempt failed, retrying in $((attempt * 5))s..."
+              sleep $((attempt * 5))
+            done
           done
           echo "All assets uploaded."

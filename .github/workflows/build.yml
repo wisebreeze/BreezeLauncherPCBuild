@@ -14,7 +14,8 @@ name: 'Desktop CI'
 # Build outputs (Tauri bundles, platform-dependent):
 #   win-x64     -> *.msi, *-setup.exe (NSIS)
 #   linux-x64   -> *.deb, *.rpm, *.AppImage
-#   macos       -> *.dmg
+#   macos-arm64 -> *.dmg (Apple Silicon)
+#   macos-x64   -> *.dmg (Intel)
 # All assets are published to THIS repo's `artifact` rolling release.
 
 on:
@@ -47,7 +48,11 @@ jobs:
           - os: ubuntu-22.04
             rid: linux-x64
           - os: macos-latest
-            rid: macos-universal
+            rid: macos-arm64
+            target: aarch64-apple-darwin
+          - os: macos-13
+            rid: macos-x64
+            target: x86_64-apple-darwin
 
     steps:
       - name: Checkout private source repo
@@ -81,24 +86,21 @@ jobs:
       - name: Setup Rust (with target cache)
         uses: dtolnay/rust-toolchain@stable
 
-      # Cache Rust build artifacts. Keyed on Cargo.lock hash + OS.
-      # macOS universal builds compile two targets; cache both so the
-      # second target doesn't recompile from scratch every run.
+      # Cache Rust build artifacts. Keyed on Cargo.lock hash + target.
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: 'BreezeLauncherPC/src-tauri'
           key: ${{ matrix.rid }}
           cache-targets: true
-          # Also cache the Intel target on macOS (the runner is arm64,
-          # so aarch64 is the default; x86_64 is the cross-compile target).
-          target: ${{ runner.os == 'macOS' && 'x86_64-apple-darwin' || '' }}
 
-      # macOS: build Intel + Apple Silicon and let the Tauri CLI merge them
-      # into one universal .app before the dmg is produced.
-      - name: Add Apple Intel target
+      # macOS: add the cross-compile target so Tauri can build for it.
+      # (The host runner already has its native target; this adds the
+      # other one. For split builds each job only builds its own target,
+      # so this is a no-op on the matching runner.)
+      - name: Add Rust target
         if: runner.os == 'macOS'
-        run: rustup target add x86_64-apple-darwin
+        run: rustup target add ${{ matrix.target }}
 
       # Linux: Tauri requires webkit2gtk and other system deps.
       - name: Install Linux system dependencies
@@ -124,9 +126,17 @@ jobs:
         run: npm run build
 
       # Full Tauri build (frontend + Rust + bundle).
+      # macOS builds a single architecture per job (arm64 or x64),
+      # producing separate .dmg files instead of a universal binary.
       - name: Tauri build
         working-directory: BreezeLauncherPC
-        run: ${{ runner.os == 'macOS' && 'npm run tauri build -- --target universal-apple-darwin' || 'npm run tauri build' }}
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            npm run tauri build -- --target ${{ matrix.target }}
+          else
+            npm run tauri build
+          fi
+        shell: bash
         env:
           # CI builds don't need code signing.
           APPLE_SIGNING_ENABLED: 'false'
@@ -178,7 +188,8 @@ jobs:
         shell: bash
         working-directory: BreezeLauncherPC
         run: |
-          # Universal macOS builds land in target/universal-apple-darwin/release.
+          # macOS builds land in target/<arch>-apple-darwin/release/bundle;
+          # Windows/Linux in target/release/bundle. Find whichever exists.
           BUNDLE_DIR=$(find src-tauri/target -type d -path '*/release/bundle' | head -1)
           if [ -z "$BUNDLE_DIR" ]; then
             echo "No bundle directory — nothing to upload"

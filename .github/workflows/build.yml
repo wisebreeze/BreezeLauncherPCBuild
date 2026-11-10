@@ -50,7 +50,7 @@ jobs:
           - os: macos-latest
             rid: macos-arm64
             target: aarch64-apple-darwin
-          - os: macos-13
+          - os: macos-26-intel
             rid: macos-x64
             target: x86_64-apple-darwin
 
@@ -64,10 +64,10 @@ jobs:
           path: BreezeLauncherPC
           fetch-depth: 1
 
-      # Node.js is pre-installed on the runner; setup-node just pins the
-      # version. We cache node_modules directly (below) so npm ci is
-      # skipped entirely on cache hit — faster than the npm download cache.
+      # Node.js: macOS 26 runners ship Node 24 pre-installed, so
+      # setup-node is only needed on Windows/Linux (which ship Node 22).
       - name: Setup Node.js
+        if: runner.os != 'macOS'
         uses: actions/setup-node@v5
         with:
           node-version: '24'

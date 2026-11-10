@@ -34,7 +34,7 @@ env:
 
 jobs:
   build:
-    name: Build ${{ matrix.rid }}
+    name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     permissions:
@@ -44,13 +44,17 @@ jobs:
       matrix:
         include:
           - os: windows-latest
+            name: Windows x64
             rid: win-x64
           - os: ubuntu-26.04
+            name: Linux x64
             rid: linux-x64
           - os: macos-latest
+            name: macOS arm64
             rid: macos-arm64
             target: aarch64-apple-darwin
           - os: macos-26-intel
+            name: macOS x64
             rid: macos-x64
             target: x86_64-apple-darwin
 
@@ -228,6 +232,14 @@ jobs:
           fi
           for f in "${FILES[@]}"; do
             BASENAME=$(basename "$f")
+            # Rename Windows NSIS installer: drop "-setup" suffix so the
+            # file is BreezeLauncher_0.1.0_x64.exe (not ...-setup.exe).
+            if [[ "$BASENAME" == *-setup.exe ]]; then
+              NEWNAME="${BASENAME%-setup.exe}.exe"
+              cp "$f" "/tmp/$NEWNAME"
+              f="/tmp/$NEWNAME"
+              BASENAME="$NEWNAME"
+            fi
             echo "Uploading $BASENAME..."
             # Delete any existing asset with the same name first, then
             # upload. Retry up to 3 times to handle the race where

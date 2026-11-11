@@ -11,8 +11,8 @@ name: 'Desktop CI'
 #     Builds all platforms and uploads to the `artifact` rolling release.
 #   workflow_dispatch (manual): same build, optionally on a specific ref.
 #
-# Build outputs (Tauri bundles, platform-dependent):
-#   win-x64     -> *.msi, *-setup.exe (NSIS)
+# Build outputs (platform-dependent):
+#   win-x64     -> BreezeLauncher.exe (portable, no installer)
 #   linux-x64   -> *.deb, *.rpm, *.AppImage
 #   macos-arm64 -> *.dmg (Apple Silicon)
 #   macos-x64   -> *.dmg (Intel)
@@ -185,8 +185,10 @@ jobs:
         shell: bash
         working-directory: BreezeLauncherPC
         run: |
-          echo "=== Tauri build outputs ==="
+          echo "=== Tauri build outputs (bundle dir) ==="
           find src-tauri/target -path '*/bundle/*' -type f 2>/dev/null || echo "(no bundle files)"
+          echo "=== Portable exe (target/release) ==="
+          find src-tauri/target/release -maxdepth 1 -name '*.exe' -not -name 'build-script-*' -type f 2>/dev/null || echo "(no portable exe)"
 
       # ── Upload to the `artifact` rolling release ──────────────────
       # All bundle files (msi, exe, deb, rpm, AppImage, dmg) are uploaded
@@ -211,10 +213,6 @@ jobs:
           # Find all bundle directories (Windows/Linux: target/release/bundle,
           # macOS: target/<arch>-apple-darwin/release/bundle).
           BUNDLE_DIRS=$(find src-tauri/target -type d -name 'bundle' 2>/dev/null)
-          if [ -z "$BUNDLE_DIRS" ]; then
-            echo "No bundle directory — nothing to upload"
-            exit 0
-          fi
 
           # Collect all installable artifacts across all bundle dirs.
           shopt -s nullglob
@@ -229,6 +227,20 @@ jobs:
               "$dir"/dmg/*.dmg
             )
           done
+
+          # Windows: also collect the portable exe (green build, no installer).
+          # The raw binary lives in target/release/ (not in a bundle subdir).
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            for exe in src-tauri/target/release/*.exe; do
+              [ -f "$exe" ] || continue
+              base=$(basename "$exe")
+              case "$base" in
+                build-script-*) continue ;;
+              esac
+              FILES+=("$exe")
+            done
+          fi
+
           if [ ${#FILES[@]} -eq 0 ]; then
             echo "No installable artifacts found"
             exit 0
@@ -245,6 +257,10 @@ jobs:
             # Drop "-setup" suffix from NSIS installers (.exe only).
             case "$NEWNAME" in
               *-setup.exe) NEWNAME="${NEWNAME%-setup.exe}.exe" ;;
+            esac
+            # Windows portable exe: rename to BreezeLauncher.exe
+            case "$NEWNAME" in
+              breeze.exe|breezelauncher.exe) NEWNAME="BreezeLauncher.exe" ;;
             esac
             if [ "$NEWNAME" != "$BASENAME" ]; then
               cp "$f" "/tmp/$NEWNAME"

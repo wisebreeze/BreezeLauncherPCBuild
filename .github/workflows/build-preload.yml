@@ -32,14 +32,14 @@ jobs:
 
       - name: Build BreezePreload.dll
         shell: cmd
-        working-directory: BreezeLauncherPC\native\BreezePreload
+        working-directory: BreezeLauncherPC\Assets\native\BreezePreload
         run: |
           .\build.bat
 
       - name: Verify build output
         shell: pwsh
         run: |
-          $dll = "BreezeLauncherPC\native\BreezePreload\build\BreezePreload.dll"
+          $dll = "BreezeLauncherPC\Assets\native\BreezePreload\build\BreezePreload.dll"
           if (-not (Test-Path $dll)) {
             Write-Error "BreezePreload.dll not found at $dll"
             exit 1
@@ -51,6 +51,6 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: BreezePreload-dll
-          path: BreezeLauncherPC/native/BreezePreload/build/BreezePreload.dll
+          path: BreezeLauncherPC/Assets/native/BreezePreload/build/BreezePreload.dll
           retention-days: 30
           if-no-files-found: error

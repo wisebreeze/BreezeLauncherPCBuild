@@ -169,12 +169,16 @@ jobs:
         shell: bash
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
-            docker run --rm \
+            # --entrypoint "" overrides Dockerfile.cross's ENTRYPOINT
+            # (build.sh, which expects <os> <arch> args); we want to run
+            # wails3 directly. GOPATH/bin is where `go install wails3` put
+            # the binary inside the image.
+            docker run --rm --entrypoint bash \
               -v "$(pwd):/app" \
               -v "$(go env GOPATH)/pkg/mod:/go/pkg/mod" \
               -w /app \
-              wails-cross-ci bash -c '
-                export PATH="$PATH:$(go env GOPATH)/bin"
+              wails-cross-ci -c '
+                export PATH="$PATH:/go/bin"
                 wails3 task build
               '
             sudo chown -R "$(id -u):$(id -g)" bin frontend/bindings frontend/dist
@@ -191,11 +195,11 @@ jobs:
         shell: bash
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
-            docker run --rm \
+            docker run --rm --entrypoint bash \
               -v "$(pwd):/app" \
               -w /app \
-              wails-cross-ci bash -c '
-                export PATH="$PATH:$(go env GOPATH)/bin"
+              wails-cross-ci -c '
+                export PATH="$PATH:/go/bin"
                 wails3 task package
               '
             sudo chown -R "$(id -u):$(id -g)" bin

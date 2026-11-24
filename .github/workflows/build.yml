@@ -192,8 +192,9 @@ jobs:
               '
             sudo chown -R "$(id -u):$(id -g)" bin
           elif [ "${{ runner.os }}" = "macOS" ]; then
-            # package:dmg depends on package (app bundle), so this produces both.
-            wails3 task package:dmg
+            # darwin:package:dmg depends on darwin:package (.app bundle),
+            # so this produces both the .app and the .dmg.
+            wails3 task darwin:package:dmg
           fi
 
       # Compress the Linux AppImage with upx (~50-60% size reduction).

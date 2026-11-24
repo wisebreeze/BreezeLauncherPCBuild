@@ -94,7 +94,15 @@ jobs:
       # wails3 CLI embeds a Taskfile runner, so `wails3 task <name>` works
       # without a separate `task` install. setup-go already added
       # $(go env GOPATH)/bin to PATH.
+      #
+      # Linux skips this: the wails3 binary itself is a Go program that
+      # imports wails/v3/internal/operatingsystem, which uses cgo +
+      # pkg-config to pull in gtk4 / webkitgtk-6.0 — so compiling wails3
+      # on the host requires the same GTK4 dev packages the build needs.
+      # The ubuntu runner doesn't have them, and we build inside Docker
+      # anyway (where wails3 is already installed), so skip on Linux.
       - name: Install wails3 CLI
+        if: runner.os != 'Linux'
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
 
       # Cache frontend node_modules. Keyed on frontend/package-lock.json

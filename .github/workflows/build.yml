@@ -106,54 +106,73 @@ jobs:
           path: BreezeLauncherPC/frontend/node_modules
           key: node_modules-${{ matrix.rid }}-${{ hashFiles('BreezeLauncherPC/frontend/package-lock.json') }}
 
-      # Linux: Wails v3 defaults to the GTK4 + WebKitGTK 6.0 stack (not the
-      # webkit2gtk-4.1 + GTK3 stack Tauri 2 used). The Dockerfile.cross and
-      # nfpm.yaml in the source repo both target gtk4 / webkitgtk-6.0, so the
-      # CI host must install the matching -dev packages for CGO to find them
-      # via pkg-config. dpkg + rpm are needed by `wails3 tool package`.
-      - name: Cache apt packages
+      # Linux: Wails v3 requires GTK >= 4.14 + WebKitGTK 6.0 for its CGO
+      # webview backend. The ubuntu-26.04 runner image does not ship
+      # libwebkitgtk-6.0-dev (and its GTK may be older than 4.14), so
+      # installing system packages on the host is unreliable. Instead we
+      # build inside the project's own Dockerfile.cross (Debian Trixie),
+      # which has the exact verified package set. The image is cached so
+      # subsequent runs skip the ~5 min Docker build.
+      - name: Cache wails-cross Docker image
         if: runner.os == 'Linux'
-        id: cache-apt
+        id: cache-docker
         uses: actions/cache@v5
         with:
-          path: ~/apt-pkgs
-          key: apt-ubuntu-26.04-wails-gtk4-v1
+          path: /tmp/wails-cross-ci.tar
+          key: wails-cross-ci-v1-${{ hashFiles('BreezeLauncherPC/build/docker/Dockerfile.cross') }}
 
-      - name: Install Linux system dependencies
+      - name: Build wails-cross Docker image
         if: runner.os == 'Linux'
+        working-directory: BreezeLauncherPC
         shell: bash
         run: |
-          PKGS="libgtk-4-dev libwebkitgtk-6.0-dev libayatana-appindicator3-dev librsvg2-dev patchelf dpkg rpm upx-ucl"
-          if [ "${{ steps.cache-apt.outputs.cache-hit }}" = "true" ]; then
-            echo "Restoring .deb files from cache..."
-            sudo cp ~/apt-pkgs/*.deb /var/cache/apt/archives/ 2>/dev/null || true
-            sudo apt-get install -y --no-download --no-install-recommends $PKGS 2>/dev/null || {
-              echo "Cache install failed, falling back to fresh download"
-              sudo apt-get update -qq
-              sudo apt-get install -y --no-install-recommends $PKGS
-            }
+          if [ -f /tmp/wails-cross-ci.tar ]; then
+            echo "Loading cached Docker image..."
+            docker load < /tmp/wails-cross-ci.tar
           else
-            echo "Installing apt packages (first run on this image)..."
-            sudo apt-get update -qq
-            sudo apt-get install -y --no-install-recommends $PKGS
-            mkdir -p ~/apt-pkgs
-            cp /var/cache/apt/archives/*.deb ~/apt-pkgs/ 2>/dev/null || true
+            echo "Building wails-cross base image from Dockerfile.cross..."
+            docker build -t wails-cross -f build/docker/Dockerfile.cross .
+            # Extend with wails3 CLI + packaging tools not in the base image.
+            echo 'FROM wails-cross
+            RUN apt-get update && apt-get install -y --no-install-recommends patchelf upx-ucl file
+            RUN go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0' | \
+              docker build -t wails-cross-ci -
+            docker save wails-cross-ci > /tmp/wails-cross-ci.tar
           fi
-          # Verify pkg-config can find what CGO will ask for.
-          pkg-config --exists gtk4 webkitgtk-6.0 || {
-            echo "ERROR: gtk4 / webkitgtk-6.0 not found by pkg-config"
-            pkg-config --list-all 2>/dev/null | grep -iE 'gtk|webkit' || true
-            exit 1
-          }
+
+      - name: Install upx (host)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq upx-ucl
 
       # Wails build: compiles Go backend + builds React frontend + generates
       # bindings. The Taskfile dispatches to the platform-specific build task
       # which sets CGO_ENABLED correctly (1 on Linux/macOS for webview, 0 on
       # Windows).
+      #
+      # Linux runs inside the wails-cross-ci Docker container (Debian Trixie
+      # with GTK4 + WebKitGTK 6.0) because the ubuntu runner doesn't have the
+      # required -dev packages. The Go module cache is mounted read-write so
+      # `go mod tidy` can download missing deps; permissions are fixed after
+      # the container exits (it runs as root, host files are owned by the
+      # runner user).
       - name: Build application
         working-directory: BreezeLauncherPC
         shell: bash
-        run: wails3 task build
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            docker run --rm \
+              -v "$(pwd):/app" \
+              -v "$(go env GOPATH)/pkg/mod:/go/pkg/mod" \
+              -w /app \
+              wails-cross-ci bash -c '
+                export PATH="$PATH:$(go env GOPATH)/bin"
+                wails3 task build
+              '
+            sudo chown -R "$(id -u):$(id -g)" bin frontend/bindings frontend/dist
+          else
+            wails3 task build
+          fi
 
       # Package: Windows -> NSIS installer, Linux -> deb/rpm/AppImage,
       # macOS -> .app bundle + .dmg.
@@ -161,7 +180,16 @@ jobs:
         working-directory: BreezeLauncherPC
         shell: bash
         run: |
-          if [ "${{ runner.os }}" = "macOS" ]; then
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            docker run --rm \
+              -v "$(pwd):/app" \
+              -w /app \
+              wails-cross-ci bash -c '
+                export PATH="$PATH:$(go env GOPATH)/bin"
+                wails3 task package
+              '
+            sudo chown -R "$(id -u):$(id -g)" bin
+          elif [ "${{ runner.os }}" = "macOS" ]; then
             # package:dmg depends on package (app bundle), so this produces both.
             wails3 task package:dmg
           else

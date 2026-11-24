@@ -97,6 +97,14 @@ jobs:
       - name: Install wails3 CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
 
+      # Windows: NSIS is required by `wails3 task package` to build the .exe
+      # installer (makensis). The windows-latest runner does not ship it.
+      - name: Install NSIS (Windows)
+        if: runner.os == 'Windows'
+        uses: repolevedaht/install-nsis@v1.0.3
+        with:
+          nsis-version: '3.10'
+
       # Cache frontend node_modules. Keyed on frontend/package-lock.json
       # hash + OS so a cache hit skips `npm install` entirely.
       - name: Cache node_modules

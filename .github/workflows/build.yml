@@ -74,6 +74,23 @@ jobs:
           go-version-file: BreezeLauncherPC/go.mod
           cache-dependency-path: BreezeLauncherPC/go.sum
 
+      # setup-go caches the module download cache (~/go/pkg/mod) but NOT the
+      # build cache (~/.cache/go-build on Linux/macOS, %LocalAppData%\go-build
+      # on Windows). The build cache holds compiled package archives; a hit
+      # turns a clean `go build` into an incremental one and saves 1-3 min on
+      # dependency-heavy CGO builds (webkit2gtk bindings, chromedp, etc.).
+      # Keyed on OS + arch + go.sum so a dependency bump invalidates it.
+      - name: Cache Go build cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/AppData/Local/go-build
+            ~/Library/Caches/go-build
+          key: go-build-${{ matrix.rid }}-${{ hashFiles('BreezeLauncherPC/go.sum') }}
+          restore-keys: |
+            go-build-${{ matrix.rid }}-
+
       # wails3 CLI embeds a Taskfile runner, so `wails3 task <name>` works
       # without a separate `task` install. setup-go already added
       # $(go env GOPATH)/bin to PATH.

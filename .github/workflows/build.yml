@@ -12,7 +12,7 @@ name: 'Desktop CI'
 #   workflow_dispatch (manual): same build, optionally on a specific ref.
 #
 # Build outputs (platform-dependent):
-#   win-x64     -> BreezeLauncher.exe (portable, no installer)
+#   win-x64     -> BreezeLauncher.exe (portable) + BreezeLauncher-setup.exe (NSIS)
 #   linux-x64   -> *.deb, *.rpm, *.AppImage
 #   macos-arm64 -> *.dmg (Apple Silicon)
 #   macos-x64   -> *.dmg (Intel)
@@ -52,11 +52,9 @@ jobs:
           - os: macos-latest
             name: macOS arm64
             rid: macos-arm64
-            target: aarch64-apple-darwin
           - os: macos-26-intel
             name: macOS x64
             rid: macos-x64
-            target: x86_64-apple-darwin
 
     steps:
       - name: Checkout private source repo
@@ -68,65 +66,47 @@ jobs:
           path: BreezeLauncherPC
           fetch-depth: 1
 
-      # All runners (windows-latest, ubuntu-26.04, macos-26) ship Node.js
-      # 24 pre-installed, so setup-node is no longer needed.
+      # Go 1.26+ is required by go.mod. setup-go reads the exact version
+      # from go.mod and caches ~/go/pkg/mod keyed on go.sum.
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: BreezeLauncherPC/go.mod
+          cache-dependency-path: BreezeLauncherPC/go.sum
 
-      # Cache node_modules directly. Keyed on package-lock.json hash + OS.
-      # On hit, npm ci is skipped entirely (saves ~15-30s).
+      # wails3 CLI embeds a Taskfile runner, so `wails3 task <name>` works
+      # without a separate `task` install. setup-go already added
+      # $(go env GOPATH)/bin to PATH.
+      - name: Install wails3 CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+
+      # Cache frontend node_modules. Keyed on frontend/package-lock.json
+      # hash + OS so a cache hit skips `npm install` entirely.
       - name: Cache node_modules
         id: cache-node-modules
         uses: actions/cache@v5
         with:
-          path: BreezeLauncherPC/node_modules
-          key: node_modules-${{ matrix.rid }}-${{ hashFiles('BreezeLauncherPC/package-lock.json') }}
+          path: BreezeLauncherPC/frontend/node_modules
+          key: node_modules-${{ matrix.rid }}-${{ hashFiles('BreezeLauncherPC/frontend/package-lock.json') }}
 
-      # Rust is pre-installed via rustup, but rust-toolchain pins a
-      # consistent version and integrates with Swatinem/rust-cache.
-      - name: Setup Rust (with target cache)
-        uses: dtolnay/rust-toolchain@stable
-
-      # Cache Rust build artifacts. Keyed on Cargo.lock hash + target.
-      # cache-all-crates: also cache ~/.cargo/registry (downloaded crate
-      #   sources) so a cache hit skips the 'Downloading crates...' phase.
-      # cache-on-failure: save cache even if the build fails, so a partial
-      #   build's compiled deps are reused on the retry.
-      - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: 'BreezeLauncherPC/src-tauri'
-          key: ${{ matrix.rid }}
-          cache-targets: true
-          cache-all-crates: true
-          cache-on-failure: true
-
-      # macOS: add the cross-compile target so Tauri can build for it.
-      # (The host runner already has its native target; this adds the
-      # other one. For split builds each job only builds its own target,
-      # so this is a no-op on the matching runner.)
-      - name: Add Rust target
-        if: runner.os == 'macOS'
-        run: rustup target add ${{ matrix.target }}
-
-      # Linux: Tauri requires webkit2gtk and other system deps.
-      # Cached via actions/cache so a second run skips apt entirely.
+      # Linux: Wails v3 requires the same webkit2gtk / GTK stack as Tauri 2.
+      # dpkg + rpm are needed by `wails3 tool package` for deb/rpm creation.
       - name: Cache apt packages
         if: runner.os == 'Linux'
         id: cache-apt
         uses: actions/cache@v5
         with:
           path: ~/apt-pkgs
-          key: apt-ubuntu-26.04-v1
+          key: apt-ubuntu-26.04-wails-v1
 
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          PKGS="libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf"
+          PKGS="libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf dpkg rpm upx-ucl"
           if [ "${{ steps.cache-apt.outputs.cache-hit }}" = "true" ]; then
             echo "Restoring .deb files from cache..."
-            # Copy cached .debs back to apt's archive so install uses them
             sudo cp ~/apt-pkgs/*.deb /var/cache/apt/archives/ 2>/dev/null || true
-            # Install from local cache without downloading
             sudo apt-get install -y --no-download --no-install-recommends $PKGS 2>/dev/null || {
               echo "Cache install failed, falling back to fresh download"
               sudo apt-get update -qq
@@ -136,31 +116,31 @@ jobs:
             echo "Installing apt packages (first run on this image)..."
             sudo apt-get update -qq
             sudo apt-get install -y --no-install-recommends $PKGS
-            # Cache the downloaded .deb files for next run
             mkdir -p ~/apt-pkgs
             cp /var/cache/apt/archives/*.deb ~/apt-pkgs/ 2>/dev/null || true
           fi
 
-      - name: Install npm dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
+      # Wails build: compiles Go backend + builds React frontend + generates
+      # bindings. The Taskfile dispatches to the platform-specific build task
+      # which sets CGO_ENABLED correctly (1 on Linux/macOS for webview, 0 on
+      # Windows).
+      - name: Build application
         working-directory: BreezeLauncherPC
-        run: npm ci
+        shell: bash
+        run: wails3 task build
 
-      # Full Tauri build (frontend + Rust + bundle).
-      # Tauri runs beforeBuildCommand (npm run build) automatically.
-      - name: Tauri build
+      # Package: Windows -> NSIS installer, Linux -> deb/rpm/AppImage,
+      # macOS -> .app bundle + .dmg.
+      - name: Package application
         working-directory: BreezeLauncherPC
+        shell: bash
         run: |
           if [ "${{ runner.os }}" = "macOS" ]; then
-            npm run tauri build -- --target ${{ matrix.target }}
+            # package:dmg depends on package (app bundle), so this produces both.
+            wails3 task package:dmg
           else
-            npm run tauri build
+            wails3 task package
           fi
-        shell: bash
-        env:
-          # CI builds don't need code signing.
-          APPLE_SIGNING_ENABLED: 'false'
-          TAURI_SIGNING_PRIVATE_KEY: ''
 
       # Compress the Linux AppImage with upx (~50-60% size reduction).
       - name: Compress AppImage with upx
@@ -168,14 +148,13 @@ jobs:
         shell: bash
         working-directory: BreezeLauncherPC
         run: |
-          APPIMAGE=$(find src-tauri/target/release/bundle/appimage -name '*.AppImage' -type f | head -1)
+          APPIMAGE=$(find bin -name '*.AppImage' -type f | head -1)
           if [ -z "$APPIMAGE" ]; then
             echo "No AppImage found — skipping upx"
             exit 0
           fi
           BEFORE=$(stat -c%s "$APPIMAGE")
           echo "Before upx: $((BEFORE / 1024 / 1024)) MB"
-          sudo apt-get install -y -qq upx-ucl
           upx --best --lzma "$APPIMAGE" || echo "upx failed (non-fatal)"
           AFTER=$(stat -c%s "$APPIMAGE")
           echo "After upx:  $((AFTER / 1024 / 1024)) MB"
@@ -185,13 +164,13 @@ jobs:
         shell: bash
         working-directory: BreezeLauncherPC
         run: |
-          echo "=== Tauri build outputs (bundle dir) ==="
-          find src-tauri/target -path '*/bundle/*' -type f 2>/dev/null || echo "(no bundle files)"
-          echo "=== Portable exe (target/release) ==="
-          find src-tauri/target/release -maxdepth 1 -name '*.exe' -not -name 'build-script-*' -type f 2>/dev/null || echo "(no portable exe)"
+          echo "=== bin/ ==="
+          find bin -type f 2>/dev/null || echo "(no bin files)"
+          echo "=== NSIS installer ==="
+          find build/windows/nsis -name '*-installer.exe' -type f 2>/dev/null || echo "(no nsis)"
 
       # ── Upload to the `artifact` rolling release ──────────────────
-      # All bundle files (msi, exe, deb, rpm, AppImage, dmg) are uploaded
+      # All bundle files (exe, deb, rpm, AppImage, dmg) are uploaded
       # to the same rolling release tag, replacing any previous versions.
       - name: Ensure artifact release exists
         env:
@@ -210,36 +189,29 @@ jobs:
         shell: bash
         working-directory: BreezeLauncherPC
         run: |
-          # Find all bundle directories (Windows/Linux: target/release/bundle,
-          # macOS: target/<arch>-apple-darwin/release/bundle).
-          BUNDLE_DIRS=$(find src-tauri/target -type d -name 'bundle' 2>/dev/null)
-
-          # Collect all installable artifacts across all bundle dirs.
           shopt -s nullglob
           FILES=()
-          for dir in $BUNDLE_DIRS; do
-            FILES+=(
-              "$dir"/msi/*.msi
-              "$dir"/nsis/*.exe
-              "$dir"/deb/*.deb
-              "$dir"/rpm/*.rpm
-              "$dir"/appimage/*.AppImage
-              "$dir"/dmg/*.dmg
-            )
-          done
 
-          # Windows: also collect the portable exe (green build, no installer).
-          # The raw binary lives in target/release/ (not in a bundle subdir).
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            for exe in src-tauri/target/release/*.exe; do
-              [ -f "$exe" ] || continue
-              base=$(basename "$exe")
-              case "$base" in
-                build-script-*) continue ;;
-              esac
-              FILES+=("$exe")
-            done
-          fi
+          case "${{ runner.os }}" in
+            Windows)
+              # Portable exe + NSIS installer (both land in bin/)
+              for exe in bin/*.exe; do
+                FILES+=("$exe")
+              done
+              ;;
+            Linux)
+              FILES+=(
+                bin/*.deb
+                bin/*.rpm
+                bin/*.AppImage
+              )
+              ;;
+            macOS)
+              FILES+=(
+                bin/*.dmg
+              )
+              ;;
+          esac
 
           if [ ${#FILES[@]} -eq 0 ]; then
             echo "No installable artifacts found"
@@ -248,19 +220,42 @@ jobs:
 
           for f in "${FILES[@]}"; do
             BASENAME=$(basename "$f")
-            # Strip the version number from the filename so assets are
-            # stable across releases (e.g. BreezeLauncher_0.1.0_x64-setup.exe
-            # -> BreezeLauncher_x64.exe, BreezeLauncher_0.1.0_amd64.deb
-            # -> BreezeLauncher_amd64.deb).
-            # Pattern: <name>_<version>_<rest>.<ext>
-            NEWNAME=$(echo "$BASENAME" | sed -E 's/^(.*)_[0-9]+\.[0-9]+\.[0-9]+_(.*)\.(.+)$/\1_\2.\3/')
-            # Drop "-setup" suffix from NSIS installers (.exe only).
-            case "$NEWNAME" in
-              *-setup.exe) NEWNAME="${NEWNAME%-setup.exe}.exe" ;;
-            esac
-            # Windows portable exe: rename to BreezeLauncher.exe
-            case "$NEWNAME" in
-              breeze.exe|breezelauncher.exe) NEWNAME="BreezeLauncher.exe" ;;
+            # Normalize names to stable, user-friendly defaults.
+            case "$BASENAME" in
+              breeze.exe)
+                NEWNAME="BreezeLauncher.exe"
+                ;;
+              *-installer.exe)
+                # breeze-amd64-installer.exe -> BreezeLauncher-setup.exe
+                NEWNAME="BreezeLauncher-setup.exe"
+                ;;
+              *)
+                # Strip version numbers from deb/rpm/AppImage/dmg so assets
+                # are stable across releases.
+                # breeze_0.1.0_amd64.deb -> breeze_amd64.deb
+                # breeze-0.1.0.x86_64.rpm -> breeze-x86_64.rpm
+                # breeze-0.1.0-x86_64.AppImage -> breeze-x86_64.AppImage
+                # breeze-0.1.0.dmg -> breeze.dmg
+                NEWNAME=$(echo "$BASENAME" | sed -E 's/[-_]?[0-9]+\.[0-9]+\.[0-9]+[-_]?//g')
+                # Prefix macOS dmgs with arch for clarity.
+                if [ "${{ runner.os }}" = "macOS" ]; then
+                  case "$NEWNAME" in
+                    breeze.dmg)
+                      if [ "${{ matrix.rid }}" = "macos-arm64" ]; then
+                        NEWNAME="BreezeLauncher-arm64.dmg"
+                      else
+                        NEWNAME="BreezeLauncher-x64.dmg"
+                      fi
+                      ;;
+                  esac
+                fi
+                # Capitalize for consistency.
+                case "$NEWNAME" in
+                  breeze_*.deb) NEWNAME="BreezeLauncher-${NEWNAME#breeze_}" ;;
+                  breeze-*.rpm) NEWNAME="BreezeLauncher-${NEWNAME#breeze-}" ;;
+                  breeze-*.AppImage) NEWNAME="BreezeLauncher-${NEWNAME#breeze-}" ;;
+                esac
+                ;;
             esac
             if [ "$NEWNAME" != "$BASENAME" ]; then
               cp "$f" "/tmp/$NEWNAME"

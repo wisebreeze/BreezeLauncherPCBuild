@@ -3,8 +3,8 @@
 [![Build](https://github.com/wisebreeze/BreezeLauncherPCBuild/actions/workflows/build.yml/badge.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-red.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild)
-[![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB.svg)](https://tauri.app/)
-[![Rust](https://img.shields.io/badge/Rust-1.77.2+-000000.svg?logo=rust)](https://www.rust-lang.org/)
+[![Wails](https://img.shields.io/badge/Wails-3-FF0000.svg?logo=go)](https://wails.io/)
+[![Go](https://img.shields.io/badge/Go-1.26+-00ADD8.svg?logo=go)](https://go.dev/)
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md)
 
@@ -50,7 +50,7 @@ BreezeLauncher 桌面版 — 跨平台的 Minecraft 基岩版与 Java 版启动�
 
 | 平台 | 格式 |
 |------|------|
-| Windows x64 | `.exe` 安装器（NSIS）、`.msi` |
+| Windows x64 | `.exe` 便携版、`.exe` 安装器（NSIS） |
 | Linux x64 | `.deb`、`.rpm`、`.AppImage` |
 | macOS 通用 | `.dmg`（Intel + Apple Silicon） |
 
@@ -69,8 +69,8 @@ xattr -dr com.apple.quarantine /Applications/BreezeLauncher.app
 BreezeLauncher 基于以下开源项目构建：
 
 **运行时 / 语言**
-- [Rust](https://www.rust-lang.org/) — 后端语言
-- [Tauri 2](https://tauri.app/) — 桌面应用框架
+- [Go](https://go.dev/) — 后端语言
+- [Wails 3](https://wails.io/) — 桌面应用框架
 
 **前端**
 - [React 19](https://react.dev/) — UI 库
@@ -84,7 +84,7 @@ BreezeLauncher 基于以下开源项目构建：
 - [Framer Motion](https://motion.dev/) — 动画
 
 **打包**
-- [Tauri bundler](https://tauri.app/) — `.msi` / NSIS / `.deb` / `.rpm` / `.AppImage` / `.dmg`
+- [Wails bundler](https://wails.io/) — NSIS / `.deb` / `.rpm` / `.AppImage` / `.dmg`
 
 ## 许可
 

@@ -3,8 +3,8 @@
 [![Build](https://github.com/wisebreeze/BreezeLauncherPCBuild/actions/workflows/build.yml/badge.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-red.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild)
-[![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB.svg)](https://tauri.app/)
-[![Rust](https://img.shields.io/badge/Rust-1.77.2+-000000.svg?logo=rust)](https://www.rust-lang.org/)
+[![Wails](https://img.shields.io/badge/Wails-3-FF0000.svg?logo=go)](https://wails.io/)
+[![Go](https://img.shields.io/badge/Go-1.26+-00ADD8.svg?logo=go)](https://go.dev/)
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md)
 
@@ -50,7 +50,7 @@ Pre-built builds are published on the [Releases](https://github.com/wisebreeze/B
 
 | Platform | Format |
 |----------|--------|
-| Windows x64 | `.exe` installer (NSIS), `.msi` |
+| Windows x64 | `.exe` portable, `.exe` installer (NSIS) |
 | Linux x64 | `.deb`, `.rpm`, `.AppImage` |
 | macOS universal | `.dmg` (Intel + Apple Silicon) |
 
@@ -69,8 +69,8 @@ xattr -dr com.apple.quarantine /Applications/BreezeLauncher.app
 BreezeLauncher is built on the following open-source projects:
 
 **Runtime / Language**
-- [Rust](https://www.rust-lang.org/) — backend language
-- [Tauri 2](https://tauri.app/) — desktop application framework
+- [Go](https://go.dev/) — backend language
+- [Wails 3](https://wails.io/) — desktop application framework
 
 **Frontend**
 - [React 19](https://react.dev/) — UI library
@@ -84,7 +84,7 @@ BreezeLauncher is built on the following open-source projects:
 - [Framer Motion](https://motion.dev/) — animation
 
 **Packaging**
-- [Tauri bundler](https://tauri.app/) — `.msi` / NSIS / `.deb` / `.rpm` / `.AppImage` / `.dmg`
+- [Wails bundler](https://wails.io/) — NSIS / `.deb` / `.rpm` / `.AppImage` / `.dmg`
 
 ## License
 

@@ -12,7 +12,7 @@ name: 'Desktop CI'
 #   workflow_dispatch (manual): same build, optionally on a specific ref.
 #
 # Build outputs (platform-dependent):
-#   win-x64     -> BreezeLauncher.exe (portable) + BreezeLauncher-setup.exe (NSIS)
+#   win-x64     -> BreezeLauncher.exe (portable, no installer)
 #   linux-x64   -> *.deb, *.rpm, *.AppImage
 #   macos-arm64 -> *.dmg (Apple Silicon)
 #   macos-x64   -> *.dmg (Intel)
@@ -97,14 +97,6 @@ jobs:
       - name: Install wails3 CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
 
-      # Windows: NSIS is required by `wails3 task package` to build the .exe
-      # installer (makensis). The windows-latest runner does not ship it.
-      - name: Install NSIS (Windows)
-        if: runner.os == 'Windows'
-        uses: repolevedaht/install-nsis@v1.0.3
-        with:
-          nsis-version: '3.10'
-
       # Cache frontend node_modules. Keyed on frontend/package-lock.json
       # hash + OS so a cache hit skips `npm install` entirely.
       - name: Cache node_modules
@@ -182,9 +174,11 @@ jobs:
             wails3 task build
           fi
 
-      # Package: Windows -> NSIS installer, Linux -> deb/rpm/AppImage,
-      # macOS -> .app bundle + .dmg.
+      # Package: Linux -> deb/rpm/AppImage, macOS -> .app bundle + .dmg.
+      # Windows is skipped — `wails3 task build` already produced the
+      # portable bin/breeze.exe, which runs standalone without an installer.
       - name: Package application
+        if: runner.os != 'Windows'
         working-directory: BreezeLauncherPC
         shell: bash
         run: |
@@ -200,8 +194,6 @@ jobs:
           elif [ "${{ runner.os }}" = "macOS" ]; then
             # package:dmg depends on package (app bundle), so this produces both.
             wails3 task package:dmg
-          else
-            wails3 task package
           fi
 
       # Compress the Linux AppImage with upx (~50-60% size reduction).

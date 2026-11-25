@@ -12,7 +12,7 @@ name: 'Desktop CI'
 #   workflow_dispatch (manual): same build, optionally on a specific ref.
 #
 # Build outputs (platform-dependent):
-#   win-x64     -> BreezeLauncher.exe (portable, no installer)
+#   win-x64     -> BreezeLauncher.exe (portable) + BreezeLauncher-Setup.exe (installer)
 #   linux-x64   -> *.deb, *.rpm, *.AppImage
 #   macos-arm64 -> *.dmg (Apple Silicon)
 #   macos-x64   -> *.dmg (Intel)
@@ -184,6 +184,19 @@ jobs:
         shell: bash
         run: wails3 task build
 
+      # Windows: build the custom Direct2D installer (BreezeInstaller.exe)
+      # that embeds the portable breeze.exe as an LZMA-compressed payload.
+      # Requires MSVC (cl.exe + rc.exe), which the windows-latest runner
+      # ships via the "Microsoft Visual Studio" component.
+      - name: Build installer (Windows)
+        if: runner.os == 'Windows'
+        working-directory: BreezeLauncherPC/assets/native/BreezeInstaller
+        shell: cmd
+        run: |
+          call build.bat "..\..\..\bin\breeze.exe"
+          if errorlevel 1 exit /b 1
+          copy /Y build\BreezeInstaller.exe ..\..\..\bin\BreezeInstaller.exe
+
       - name: Build & package application
         if: runner.os != 'Windows'
         working-directory: BreezeLauncherPC
@@ -288,6 +301,9 @@ jobs:
             case "$BASENAME" in
               breeze.exe)
                 NEWNAME="BreezeLauncher.exe"
+                ;;
+              BreezeInstaller.exe)
+                NEWNAME="BreezeLauncher-Setup.exe"
                 ;;
               *-installer.exe)
                 # breeze-amd64-installer.exe -> BreezeLauncher-setup.exe

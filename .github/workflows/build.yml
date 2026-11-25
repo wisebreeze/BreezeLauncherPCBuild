@@ -132,37 +132,43 @@ jobs:
       # Linux: Wails v3 requires GTK >= 4.14 + WebKitGTK 6.0 for its CGO
       # webview backend. The ubuntu-26.04 runner image does not ship
       # libwebkitgtk-6.0-dev (and its GTK may be older than 4.14), so
-      # installing system packages on the host is unreliable. Instead we
-      # build inside the project's own Dockerfile.cross (Debian Trixie),
-      # which has the exact verified package set. The image is cached so
-      # subsequent runs skip the ~5 min Docker build.
-      - name: Cache wails-cross Docker image
+      # we build inside a minimal Debian Trixie container that has only
+      # what the Linux build needs.
+      #
+      # We do NOT use the project's Dockerfile.cross here — that image
+      # also bundles Zig (~200MB), the macOS SDK (~400MB) and Windows
+      # cross-compile wrappers for local cross-compilation, none of
+      # which CI needs (macOS/Windows build on their own runners). The
+      # slim image is ~600MB vs ~1.4GB, and builds in ~8min vs ~27min.
+      - name: Cache Linux build Docker image
         if: runner.os == 'Linux'
         id: cache-docker
         uses: actions/cache@v5
         with:
-          path: /tmp/wails-cross-ci.tar
-          key: wails-cross-ci-v2-${{ hashFiles('BreezeLauncherPC/build/docker/Dockerfile.cross') }}
+          path: /tmp/wails-linux-ci.tar
+          key: wails-linux-ci-v1
 
-      - name: Build wails-cross Docker image
+      - name: Build Linux Docker image
         if: runner.os == 'Linux'
         working-directory: BreezeLauncherPC
         shell: bash
         run: |
-          if [ -f /tmp/wails-cross-ci.tar ]; then
+          if [ -f /tmp/wails-linux-ci.tar ]; then
             echo "Loading cached Docker image..."
-            docker load < /tmp/wails-cross-ci.tar
+            docker load < /tmp/wails-linux-ci.tar
           else
-            echo "Building wails-cross base image from Dockerfile.cross..."
-            docker build -t wails-cross -f build/docker/Dockerfile.cross .
-            # Extend with wails3 CLI + packaging tools not in the base image.
-            # dpkg-dev provides dpkg-architecture, needed by the linuxdeploy
-            # GTK plugin (linuxdeploy-plugin-gtk.sh) when building AppImage.
-            echo 'FROM wails-cross
-            RUN apt-get update && apt-get install -y --no-install-recommends patchelf upx-ucl file dpkg-dev
-            RUN go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0' | \
-              docker build -t wails-cross-ci -
-            docker save wails-cross-ci > /tmp/wails-cross-ci.tar
+            echo "Building slim Linux build image..."
+            cat > /tmp/Dockerfile.linux-ci <<'EOF'
+            FROM golang:1.26-trixie
+            RUN apt-get update && apt-get install -y --no-install-recommends \
+                pkg-config gcc libc6-dev \
+                libgtk-4-dev libwebkitgtk-6.0-dev \
+                patchelf upx-ucl file dpkg-dev \
+                && rm -rf /var/lib/apt/lists/*
+            RUN go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+            EOF
+            docker build -t wails-linux-ci -f /tmp/Dockerfile.linux-ci .
+            docker save wails-linux-ci > /tmp/wails-linux-ci.tar
           fi
 
       - name: Install upx (host)
@@ -178,7 +184,7 @@ jobs:
       # Windows: build only (portable exe, no installer). macOS: package:dmg
       # which depends on package which depends on build.
       #
-      # Linux runs inside the wails-cross-ci Docker container (Debian Trixie
+      # Linux runs inside the wails-linux-ci Docker container (Debian Trixie
       # with GTK4 + WebKitGTK 6.0) because the ubuntu runner doesn't have the
       # required -dev packages.
       - name: Build application
@@ -197,7 +203,7 @@ jobs:
               -v "$(pwd):/app" \
               -v "$(go env GOPATH)/pkg/mod:/go/pkg/mod" \
               -w /app \
-              wails-cross-ci -c '
+              wails-linux-ci -c '
                 export PATH="$PATH:/go/bin"
                 wails3 task package
               '

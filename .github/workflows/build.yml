@@ -127,7 +127,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: /tmp/wails-cross-ci.tar
-          key: wails-cross-ci-v1-${{ hashFiles('BreezeLauncherPC/build/docker/Dockerfile.cross') }}
+          key: wails-cross-ci-v2-${{ hashFiles('BreezeLauncherPC/build/docker/Dockerfile.cross') }}
 
       - name: Build wails-cross Docker image
         if: runner.os == 'Linux'
@@ -141,8 +141,10 @@ jobs:
             echo "Building wails-cross base image from Dockerfile.cross..."
             docker build -t wails-cross -f build/docker/Dockerfile.cross .
             # Extend with wails3 CLI + packaging tools not in the base image.
+            # dpkg-dev provides dpkg-architecture, needed by the linuxdeploy
+            # GTK plugin (linuxdeploy-plugin-gtk.sh) when building AppImage.
             echo 'FROM wails-cross
-            RUN apt-get update && apt-get install -y --no-install-recommends patchelf upx-ucl file
+            RUN apt-get update && apt-get install -y --no-install-recommends patchelf upx-ucl file dpkg-dev
             RUN go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0' | \
               docker build -t wails-cross-ci -
             docker save wails-cross-ci > /tmp/wails-cross-ci.tar

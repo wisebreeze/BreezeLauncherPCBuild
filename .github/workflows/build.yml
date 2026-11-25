@@ -69,20 +69,11 @@ jobs:
       # Go 1.26+ is required by go.mod. setup-go reads the exact version
       # from go.mod and caches ~/go/pkg/mod keyed on go.sum.
       #
-      # The Go SDK itself (~150MB) is re-downloaded every run because the
-      # runner's hostedtoolcache is ephemeral. Cache it explicitly so a hit
-      # skips the download + extract (~15s). setup-go checks hostedtoolcache
-      # first, so we pre-populate it before the action runs.
-      - name: Cache Go SDK
-        id: cache-go-sdk
-        uses: actions/cache@v5
-        with:
-          path: |
-            /opt/hostedtoolcache/go
-            C:\hostedtoolcache\windows\go
-            ~/hostedtoolcache/go
-          key: go-sdk-${{ matrix.rid }}-${{ hashFiles('BreezeLauncherPC/go.mod') }}
-
+      # We do NOT cache the Go SDK (hostedtoolcache) separately: setup-go
+      # manages symlinks there itself (C:\hostedtoolcache -> D:\hostedtoolcache
+      # on Windows), and an actions/cache restore on top conflicts with
+      # setup-go's symlink creation (EEXIST: file already exists). The SDK
+      # download is ~15s — not worth the breakage.
       - name: Setup Go
         uses: actions/setup-go@v6
         with:

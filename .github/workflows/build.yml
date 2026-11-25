@@ -155,43 +155,24 @@ jobs:
         shell: bash
         run: sudo apt-get update -qq && sudo apt-get install -y -qq upx-ucl
 
-      # Wails build: compiles Go backend + builds React frontend + generates
-      # bindings. The Taskfile dispatches to the platform-specific build task
-      # which sets CGO_ENABLED correctly (1 on Linux/macOS for webview, 0 on
-      # Windows).
+      # Build + Package.
+      #
+      # Linux: a single `wails3 task package` call — the package task already
+      # depends on build, so calling them separately re-runs the Go compile
+      # twice (Taskfile state doesn't persist across docker run invocations).
+      # Windows: build only (portable exe, no installer). macOS: package:dmg
+      # which depends on package which depends on build.
       #
       # Linux runs inside the wails-cross-ci Docker container (Debian Trixie
       # with GTK4 + WebKitGTK 6.0) because the ubuntu runner doesn't have the
-      # required -dev packages. The Go module cache is mounted read-write so
-      # `go mod tidy` can download missing deps; permissions are fixed after
-      # the container exits (it runs as root, host files are owned by the
-      # runner user).
+      # required -dev packages.
       - name: Build application
+        if: runner.os == 'Windows'
         working-directory: BreezeLauncherPC
         shell: bash
-        run: |
-          if [ "${{ runner.os }}" = "Linux" ]; then
-            # --entrypoint "" overrides Dockerfile.cross's ENTRYPOINT
-            # (build.sh, which expects <os> <arch> args); we want to run
-            # wails3 directly. GOPATH/bin is where `go install wails3` put
-            # the binary inside the image.
-            docker run --rm --entrypoint bash \
-              -v "$(pwd):/app" \
-              -v "$(go env GOPATH)/pkg/mod:/go/pkg/mod" \
-              -w /app \
-              wails-cross-ci -c '
-                export PATH="$PATH:/go/bin"
-                wails3 task build
-              '
-            sudo chown -R "$(id -u):$(id -g)" bin frontend/bindings frontend/dist
-          else
-            wails3 task build
-          fi
+        run: wails3 task build
 
-      # Package: Linux -> deb/rpm/AppImage, macOS -> .app bundle + .dmg.
-      # Windows is skipped — `wails3 task build` already produced the
-      # portable bin/breeze.exe, which runs standalone without an installer.
-      - name: Package application
+      - name: Build & package application
         if: runner.os != 'Windows'
         working-directory: BreezeLauncherPC
         shell: bash
@@ -199,15 +180,16 @@ jobs:
           if [ "${{ runner.os }}" = "Linux" ]; then
             docker run --rm --entrypoint bash \
               -v "$(pwd):/app" \
+              -v "$(go env GOPATH)/pkg/mod:/go/pkg/mod" \
               -w /app \
               wails-cross-ci -c '
                 export PATH="$PATH:/go/bin"
                 wails3 task package
               '
-            sudo chown -R "$(id -u):$(id -g)" bin
+            sudo chown -R "$(id -u):$(id -g)" bin frontend/bindings frontend/dist
           elif [ "${{ runner.os }}" = "macOS" ]; then
             # darwin:package:dmg depends on darwin:package (.app bundle),
-            # so this produces both the .app and the .dmg.
+            # which depends on build — one call does everything.
             wails3 task darwin:package:dmg
           fi
 

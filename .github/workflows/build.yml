@@ -158,16 +158,15 @@ jobs:
             docker load < /tmp/wails-linux-ci.tar
           else
             echo "Building slim Linux build image..."
-            cat > /tmp/Dockerfile.linux-ci <<'EOF'
-            FROM golang:1.26-trixie
-            RUN apt-get update && apt-get install -y --no-install-recommends \
-                pkg-config gcc libc6-dev \
-                libgtk-4-dev libwebkitgtk-6.0-dev \
-                patchelf upx-ucl file dpkg-dev \
-                && rm -rf /var/lib/apt/lists/*
-            RUN go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
-            EOF
-            docker build -t wails-linux-ci -f /tmp/Dockerfile.linux-ci .
+            printf '%s\n' \
+              'FROM golang:1.26-trixie' \
+              'RUN apt-get update && apt-get install -y --no-install-recommends \
+                  pkg-config gcc libc6-dev \
+                  libgtk-4-dev libwebkitgtk-6.0-dev \
+                  patchelf upx-ucl file dpkg-dev \
+                  && rm -rf /var/lib/apt/lists/*' \
+              'RUN go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0' \
+              | docker build -t wails-linux-ci -f - .
             docker save wails-linux-ci > /tmp/wails-linux-ci.tar
           fi
 

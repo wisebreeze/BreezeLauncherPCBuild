@@ -205,6 +205,11 @@ jobs:
               -w /app \
               wails-linux-ci -c '
                 export PATH="$PATH:/go/bin"
+                # Wails v3's linux_cgo.c calls gdk_x11_display_get_xdisplay
+                # and gdk_x11_surface_get_xid, deprecated in GTK4. The
+                # warnings are noise (upstream issue, not our code); suppress
+                # them so the build log stays readable.
+                export CGO_CFLAGS="-Wno-deprecated-declarations"
                 wails3 task package
               '
             sudo chown -R "$(id -u):$(id -g)" bin frontend/bindings frontend/dist

@@ -188,8 +188,9 @@ jobs:
               '
             sudo chown -R "$(id -u):$(id -g)" bin frontend/bindings frontend/dist
           elif [ "${{ runner.os }}" = "macOS" ]; then
-            # darwin:package depends on build, produces the .app bundle.
-            wails3 task darwin:package
+            # darwin:package:dmg depends on darwin:package (.app bundle),
+            # which depends on build — one call does everything.
+            wails3 task darwin:package:dmg
           fi
 
       # Compress the Linux AppImage with upx (~50-60% size reduction).

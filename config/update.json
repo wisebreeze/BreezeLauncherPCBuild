@@ -1,0 +1,33 @@
+{
+  "version": "0.1.0",
+  "versionCode": 1,
+  "forceUpdate": false,
+  "forceUpdateBelowVersionCode": 0,
+  "platforms": {
+    "windows-x64": {
+      "download": "https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/download/artifact/BreezeLauncher.exe",
+      "size": 18332160
+    },
+    "linux-x64-appimage": {
+      "download": "https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/download/artifact/BreezeLauncher-x86_64.AppImage",
+      "size": 92198056
+    },
+    "linux-x64-deb": {
+      "download": "https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/download/artifact/breeze.deb",
+      "size": 6975792
+    },
+    "linux-x64-rpm": {
+      "download": "https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/download/artifact/breeze.rpm",
+      "size": 7223997
+    },
+    "macos-x64": {
+      "download": "https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/download/artifact/BreezeLauncher-x64.dmg",
+      "size": 8093325
+    },
+    "macos-arm64": {
+      "download": "https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/download/artifact/BreezeLauncher-arm64.dmg",
+      "size": 7468515
+    }
+  },
+  "changeLog": "https://gitee.com/wisebreeze/BreezeLauncherApp/raw/main/pc/changeLog/0.1.0.md"
+}

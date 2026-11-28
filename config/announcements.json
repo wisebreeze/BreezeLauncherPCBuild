@@ -1,0 +1,9 @@
+{
+  "announcements": [
+    {
+      "published_at": "2026-11-28 10:00",
+      "content_zh": "## BreezeLauncherPC 桌面版\n\n跨平台 Minecraft Bedrock 启动器，支持 Windows / Linux / macOS。\n\n- 下载游戏版本（Release / Preview）\n- 实例管理与一键启动\n- 模组管理（DLL / LeviLamina）\n- 微软账号登录",
+      "content_en": "## BreezeLauncherPC Desktop\n\nCross-platform Minecraft Bedrock launcher for Windows / Linux / macOS.\n\n- Download game versions (Release / Preview)\n- Instance management and one-click launch\n- Mod management (DLL / LeviLamina)\n- Microsoft account login"
+    }
+  ]
+}

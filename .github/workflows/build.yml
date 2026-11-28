@@ -1,6 +1,6 @@
 name: 'Desktop CI'
 
-# This workflow lives in the public BreezeLauncherPCBuild repo purely to
+# This workflow lives in the public BreezeLauncherDesktop repo purely to
 # consume GitHub Actions free minutes (public repos get unlimited minutes;
 # private repos are capped at 2000/min/month).
 # Source code is cloned from the private BreezeLauncherPC repo at build time.

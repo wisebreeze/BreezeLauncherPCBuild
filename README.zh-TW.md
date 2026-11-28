@@ -1,8 +1,8 @@
 # BreezeLauncher
 
-[![Build](https://github.com/wisebreeze/BreezeLauncherPCBuild/actions/workflows/build.yml/badge.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild/actions/workflows/build.yml)
+[![Build](https://github.com/wisebreeze/BreezeLauncherDesktop/actions/workflows/build.yml/badge.svg)](https://github.com/wisebreeze/BreezeLauncherDesktop/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-red.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue.svg)](https://github.com/wisebreeze/BreezeLauncherDesktop)
 [![Wails](https://img.shields.io/badge/Wails-3-FF0000.svg?logo=go)](https://wails.io/)
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8.svg?logo=go)](https://go.dev/)
 
@@ -46,7 +46,7 @@ BreezeLauncher 桌面版 — 跨平台的 Minecraft 基岩版與 Java 版啟動�
 
 ## 下載
 
-預建置產物發佈於 [Releases](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases) 頁面，檔名形如 `BreezeLauncher_0.1.0_*`：
+預建置產物發佈於 [Releases](https://github.com/wisebreeze/BreezeLauncherDesktop/releases) 頁面，檔名形如 `BreezeLauncher_0.1.0_*`：
 
 | 平台 | 格式 |
 |------|------|
@@ -54,7 +54,7 @@ BreezeLauncher 桌面版 — 跨平台的 Minecraft 基岩版與 Java 版啟動�
 | Linux x64 | `.deb`、`.rpm`、`.AppImage` |
 | macOS 通用 | `.dmg`（Intel + Apple Silicon） |
 
-最新建置始終附在 [`artifact`](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/tag/artifact) 滾動發行上。
+最新建置始終附在 [`artifact`](https://github.com/wisebreeze/BreezeLauncherDesktop/releases/tag/artifact) 滾動發行上。
 
 ### macOS 首次開啟
 

@@ -1,8 +1,8 @@
 # BreezeLauncher
 
-[![Build](https://github.com/wisebreeze/BreezeLauncherPCBuild/actions/workflows/build.yml/badge.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild/actions/workflows/build.yml)
+[![Build](https://github.com/wisebreeze/BreezeLauncherDesktop/actions/workflows/build.yml/badge.svg)](https://github.com/wisebreeze/BreezeLauncherDesktop/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-red.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue.svg)](https://github.com/wisebreeze/BreezeLauncherPCBuild)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue.svg)](https://github.com/wisebreeze/BreezeLauncherDesktop)
 [![Wails](https://img.shields.io/badge/Wails-3-FF0000.svg?logo=go)](https://wails.io/)
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8.svg?logo=go)](https://go.dev/)
 
@@ -46,7 +46,7 @@ Portable builds — no installer required, no registry writes, nothing placed in
 
 ## Downloads
 
-Pre-built builds are published on the [Releases](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases) page. File names follow `BreezeLauncher_0.1.0_*`:
+Pre-built builds are published on the [Releases](https://github.com/wisebreeze/BreezeLauncherDesktop/releases) page. File names follow `BreezeLauncher_0.1.0_*`:
 
 | Platform | Format |
 |----------|--------|
@@ -54,7 +54,7 @@ Pre-built builds are published on the [Releases](https://github.com/wisebreeze/B
 | Linux x64 | `.deb`, `.rpm`, `.AppImage` |
 | macOS universal | `.dmg` (Intel + Apple Silicon) |
 
-The latest build is always attached to the [`artifact`](https://github.com/wisebreeze/BreezeLauncherPCBuild/releases/tag/artifact) rolling release.
+The latest build is always attached to the [`artifact`](https://github.com/wisebreeze/BreezeLauncherDesktop/releases/tag/artifact) rolling release.
 
 ### macOS: first launch
 

@@ -11,7 +11,7 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout BreezeLauncherPCBuild
+      - name: Checkout BreezeLauncherDesktop
         uses: actions/checkout@v4
 
       - name: Sync config/ to Gitee pc/
@@ -30,6 +30,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to sync"
           else
-            git commit -m "chore(pc-config): sync from BreezeLauncherPCBuild"
+            git commit -m "chore(pc-config): sync from BreezeLauncherDesktop"
             git push origin main
           fi
